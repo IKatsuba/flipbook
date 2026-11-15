@@ -13,11 +13,14 @@ try await comp.video(to: URL(filePath: "out/demo.mp4"), codec: .hevc)
 try await comp.video(to: URL(filePath: "out/part.mp4"), range: 60..<150) { done, total in print("\(done)/\(total)") }
 try await comp.video(to: URL(filePath: "out/sound.mp4"), audio: URL(filePath: "music.m4a"))
 try await comp.video(to: URL(filePath: "out/overlay.mov"), codec: .proRes4444)   // with alpha, when comp.transparent is set
+comp.preview()                                                                 // a window that plays it; returns when closed
 let image = try comp.still(at: 42)
 try comp.still(at: 42, to: URL(filePath: "out/frame.png"))
 ```
 
-`width` and `height` are points; the video is `width × scale` by `height × scale` pixels (MyGo counts the other way round: pixels, divided by the scale). `Frame` has `index`, `time`, `progress`, `interpolate` (piecewise, with easing), `spring` (a damped spring in closed form, checked in the tests against fixed-step integration, with `settle:` to make it arrive exactly after a number of frames), `sequence(from:duration:)`, `shift(by:)` and `loop(duration:)`.
+Other repositories use it as a package: `.package(path:)` or `.package(url:)` to this repository, the `Flipbook` product, and a `main.swift` like the one above. There are no dependencies.
+
+`width` and `height` are points; the video is `width × scale` by `height × scale` pixels (MyGo counts the other way round: pixels, divided by the scale). `Frame` has `index`, `time`, `progress`, `interpolate` (piecewise, with easing), `spring` (a damped spring in closed form, checked in the tests against fixed-step integration, with `settle:` to make it arrive exactly after a number of frames), `sequence(from:duration:)`, `shift(by:)` and `loop(duration:)`, and helpers for what every scene ends up needing: `typed` for text that is typed in, `fade(in:out:)`, `interpolate` over colours, and `snap` to round an animated offset to whole pixels.
 
 The rule for views: depend on the frame and nothing else. No `withAnimation`, no `.animation`, no `Date()`, no `TimelineView`, and load fonts and images before rendering (`Fonts.register(at:)` takes a font file or a folder of them and returns the names for `Font.custom`). Flipbook disables animations in the transaction of every frame, but cannot stop a view from reading a clock.
 
@@ -27,6 +30,7 @@ The rule for views: depend on the frame and nothing else. No `withAnimation`, no
 swift run -c release flipbook-demo                                  # out/demo.mp4, 2160×2700, 6 s
 swift run -c release flipbook-demo render --path image-renderer --speed 1
 swift run -c release flipbook-demo still --frame 90 --out out/frame.png
+swift run -c release flipbook-demo preview                          # a window that plays the scene, with a scrubber
 swift run -c release flipbook-demo verify                           # determinism, see below
 swift run -c release flipbook-demo layers                           # the CALayer tree SwiftUI builds
 swift run -c release flipbook-demo bench-all                        # the tables below, several minutes
@@ -140,4 +144,4 @@ At 1x, text that is moved by a spring keeps hopping by a pixel long after it loo
 - Find what makes `ImageRenderer.cgImage` differ on first draws. It is why `core-animation` is the default: as fast, far less resident memory, and pure, at the price of leaning on undocumented behaviour.
 - Text is still rasterised on the CPU into `CGDrawingLayer` bitmaps. It is cheap here; a scene with far more changing text would show whether that becomes the draw bottleneck.
 - Scenes that are harder for Core Animation: blurs, masks, `drawingGroup()`, images, and whether each survives `CARenderer` offscreen.
-- ProRes and transparent output; motion blur by averaging sub-frame samples; audio.
+- Motion blur by averaging sub-frame samples; HEVC with alpha; sound placed per sequence rather than one file under the whole video.

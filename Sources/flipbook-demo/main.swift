@@ -3,7 +3,7 @@ import Flipbook
 import Foundation
 import SwiftUI
 
-// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench|bench-all] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH] [--from n] [--to n] [--audio file] [--transparent 1]
+// flipbook-demo [render|still|preview|layers|hashes|verify|diff|cross|bench|bench-all] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH] [--from n] [--to n] [--audio file] [--transparent 1]
 
 struct Arguments {
     var command = "render"
@@ -175,6 +175,11 @@ do {
         let url = arguments.url("out/still-\(index).png")
         try composition.still(at: index, to: url, path: path)
         print(url.path)
+
+    case "preview":
+        // A window that plays the scene; --frame starts it paused there.
+        let start = Int(arguments.options["frame"] ?? "")
+        composition.preview(title: "flipbook-demo", startAt: start ?? 0, playing: start == nil)
 
     case "layers":
         // What SwiftUI hands to Core Animation for one frame.
