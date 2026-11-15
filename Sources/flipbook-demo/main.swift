@@ -1,9 +1,7 @@
 import AppKit
 import Flipbook
 import Foundation
-import ImageIO
 import SwiftUI
-import UniformTypeIdentifiers
 
 // flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench|bench-all] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH]
 
@@ -45,15 +43,6 @@ struct Arguments {
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data("flipbook-demo: \(message)\n".utf8))
     exit(1)
-}
-
-func writePNG(_ image: CGImage, to url: URL) throws {
-    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-    guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
-        fail("cannot create \(url.path)")
-    }
-    CGImageDestinationAddImage(destination, image, nil)
-    guard CGImageDestinationFinalize(destination) else { fail("cannot write \(url.path)") }
 }
 
 /// User plus system CPU time of the whole process, every thread included.
@@ -173,7 +162,7 @@ do {
     case "still":
         let index = Int(arguments.options["frame"] ?? "") ?? 120
         let url = arguments.url("out/still-\(index).png")
-        try writePNG(try composition.still(at: index, path: path), to: url)
+        try composition.still(at: index, to: url, path: path)
         print(url.path)
 
     case "layers":

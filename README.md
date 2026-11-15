@@ -11,6 +11,7 @@ let comp = Composition(width: 1080, height: 1350, fps: 60, frames: 360, scale: 2
 }
 try await comp.video(to: URL(filePath: "out/demo.mp4"), codec: .hevc)
 let image = try comp.still(at: 42)
+try comp.still(at: 42, to: URL(filePath: "out/frame.png"))
 ```
 
 `width` and `height` are points; the video is `width × scale` by `height × scale` pixels (MyGo counts the other way round: pixels, divided by the scale). `Frame` has `index`, `time`, `progress`, `interpolate` (piecewise, with easing), `spring` (a damped spring in closed form, checked in the tests against fixed-step integration, with `settle:` to make it arrive exactly after a number of frames), `sequence(from:duration:)`, `shift(by:)` and `loop(duration:)`.

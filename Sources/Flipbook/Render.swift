@@ -1,6 +1,8 @@
 import AVFoundation
 import CoreVideo
+import ImageIO
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// What a render cost. Stage times are wall-clock sums over all frames.
 public struct RenderStats: Sendable, Codable {
@@ -69,6 +71,17 @@ extension Composition {
         let buffer = try PixelBuffers.make(from: pool)
         try makeRenderer(path).render(index, into: buffer)
         return try PixelBuffers.image(buffer)
+    }
+
+    /// One frame written to a PNG file; folders on the way are created.
+    public func still(at index: Int, to url: URL, path: RenderPath = .coreAnimation) throws {
+        let image = try still(at: index, path: path)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+            throw FlipbookError.writer("cannot create \(url.path)")
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { throw FlipbookError.writer("cannot write \(url.path)") }
     }
 
     func run(renderer: any FrameRenderer, sink: VideoSink?, range: Range<Int>, hashFrames: Bool) async throws -> RenderStats {
