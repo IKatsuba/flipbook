@@ -31,6 +31,8 @@ final class CoreAnimationPath<Content: View>: FrameRenderer {
 
     init(_ composition: Composition<Content>, transparent: Bool = false) throws {
         self.composition = composition
+        // AppKit's windows and SwiftUI's hosting views want an application object, even off screen.
+        _ = NSApplication.shared
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
             throw FlipbookError.metal("no Metal device")
         }

@@ -158,8 +158,6 @@ func crossCheck<V: View>(_ composition: Composition<V>, path: RenderPath, refere
 }
 
 let arguments = Arguments(Array(CommandLine.arguments.dropFirst()))
-// SwiftUI's AppKit-backed pieces want an application object, even with no window on screen.
-_ = NSApplication.shared
 
 do {
     let path = arguments.path
