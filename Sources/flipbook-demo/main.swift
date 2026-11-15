@@ -3,7 +3,7 @@ import Flipbook
 import Foundation
 import SwiftUI
 
-// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench|bench-all] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH]
+// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench|bench-all] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH] [--from n] [--to n]
 
 struct Arguments {
     var command = "render"
@@ -156,7 +156,10 @@ do {
     switch arguments.command {
     case "render":
         let url = arguments.url("out/demo.mp4")
-        let stats = try await composition.video(to: url, codec: arguments.codec, path: path, prioritizeSpeed: arguments.speed)
+        // --from and --to render part of the timeline.
+        let from = Int(arguments.options["from"] ?? "") ?? 0
+        let to = Int(arguments.options["to"] ?? "") ?? composition.frames
+        let stats = try await composition.video(to: url, codec: arguments.codec, path: path, range: from..<to, prioritizeSpeed: arguments.speed)
         print("\(url.path): \(summary(stats)), \(fileSize(url)) bytes")
 
     case "still":

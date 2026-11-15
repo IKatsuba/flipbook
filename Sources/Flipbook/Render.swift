@@ -47,17 +47,23 @@ extension Composition {
     }
 
     /// Encodes the composition to an MP4.
+    ///
+    /// `range` renders part of it, for working on one scene of a long video: the view still gets
+    /// the frame numbers of the whole composition, and the file starts at the range's first frame.
     @discardableResult
     public func video(
         to url: URL,
         codec: Codec = .hevc,
         path: RenderPath = .coreAnimation,
+        range: Range<Int>? = nil,
         bitrate: Int? = nil,
         prioritizeSpeed: Bool = false,
         hashFrames: Bool = false
     ) async throws -> RenderStats {
+        let range = (range ?? 0..<frames).clamped(to: 0..<frames)
+        guard !range.isEmpty else { throw FlipbookError.writer("there are no frames to render in \(range)") }
         let sink = try VideoSink(url: url, width: pixelWidth, height: pixelHeight, fps: fps, codec: codec, bitrate: bitrate, prioritizeSpeed: prioritizeSpeed)
-        return try await run(renderer: makeRenderer(path), sink: sink, range: 0..<frames, hashFrames: hashFrames)
+        return try await run(renderer: makeRenderer(path), sink: sink, range: range, hashFrames: hashFrames)
     }
 
     /// Renders frames without encoding them and returns the SHA-256 of every pixel buffer.
