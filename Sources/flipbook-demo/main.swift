@@ -5,7 +5,7 @@ import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
-// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH]
+// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench|bench-all] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH]
 
 struct Arguments {
     var command = "render"
@@ -208,6 +208,11 @@ do {
 
     case "cross":
         try crossCheck(composition, path: path, reference: .imageRenderer, range: 60..<min(arguments.frames, 120))
+
+    case "bench-all":
+        // The whole matrix behind the README tables; takes several minutes.
+        BenchMatrix.runs = Int(arguments.options["runs"] ?? "") ?? 3
+        try BenchMatrix.main()
 
     case "bench":
         // Warm up SwiftUI, the glyph caches, the shaders and the encoder, then measure one full render.

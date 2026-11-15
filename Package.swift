@@ -15,11 +15,6 @@ let package = Package(
             dependencies: ["Flipbook"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
-        .executableTarget(
-            name: "chord-promo",
-            dependencies: ["Flipbook"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
-        ),
         .testTarget(
             name: "FlipbookTests",
             dependencies: ["Flipbook"],

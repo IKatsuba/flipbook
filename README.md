@@ -25,8 +25,7 @@ swift run -c release flipbook-demo render --path core-animation --speed 1
 swift run -c release flipbook-demo still --frame 90 --out out/frame.png
 swift run -c release flipbook-demo verify --path core-animation     # determinism, see below
 swift run -c release flipbook-demo layers                           # the CALayer tree SwiftUI builds
-swift build -c release && deno run --allow-run --allow-read --allow-write scripts/bench.ts
-swift run -c release chord-promo                                    # out/chord-promo.mp4, see below
+swift run -c release flipbook-demo bench-all                        # the tables below, several minutes
 ```
 
 The demo is a dark card with a pink glow and a faint grid, a monospace kicker, "Make" rising on a spring and "changelogs" typed after it, a frame counter and a progress bar.
@@ -126,17 +125,15 @@ The baseline is reproducible but not pure. Rendering the same sequence in a fres
 
 The other three paths passed every check, so on this machine their frames are a function of the frame number alone. Nothing here says anything about other GPUs or OS versions: the GPU paths are not expected to match each other or another machine bit for bit, and they differ from the baseline by a fraction of a level.
 
-## A longer example: chord-promo
+## Text that hops by a pixel
 
-`swift run -c release chord-promo` writes `out/chord-promo.mp4`: a 29 second, 1920×1080, 60 fps promo for [chord](https://github.com/IKatsuba/chord). `--vertical 1` writes a 1080×1920 version with a narrower terminal and the caption above it, and `--scale 2` doubles either. It is one `Composition` of six scenes cut with `frame.sequence`: the logo, the agent picker, a diff, a permission prompt, a team at work and the install line. The terminal is rebuilt in SwiftUI from chord's own theme colours, pixel mark and screenshots, set in JetBrains Mono, which must be installed. It renders through `core-animation` at about 190 fps for 1080p and 52 fps for 4K, shadows and all. There is no sound: Flipbook does not do audio.
-
-One thing it taught: at 1x, text that is moved by a spring keeps hopping by a pixel long after it looks still. A spring's tail never reaches 1, SwiftUI puts every text layer on whole pixels, and a resting position that falls on half a pixel rounds one way with a tiny offset and the other way without it. `chord-promo probe` showed the caption going 970, 971, 970 over two seconds. Two things fix it: `spring(settle:)`, which bends the curve to land exactly, and rounding animated offsets to whole pixels. At 2x the hop is half a point and hard to see, which is why the 4K render looked fine.
+At 1x, text that is moved by a spring keeps hopping by a pixel long after it looks still. A spring's tail never reaches 1, SwiftUI puts every text layer on whole pixels, and a resting position that falls on half a pixel rounds one way with a tiny offset and the other way without it. Measured on a 1920×1080 scene, a caption went 970, 971, 970 over two seconds. Two things fix it: `spring(settle:)`, which bends the curve to land exactly, and rounding animated offsets to whole pixels. At 2x the hop is half a point and hard to see.
 
 ## What to try next
 
 - More than one encoder. A single hardware session is the ceiling; splitting the timeline into segments encoded by parallel `VTCompressionSession`s and concatenated would show whether the media engine scales.
 - Rendering and encoding overlapped properly. The loop waits for the GPU after every frame; with the encoder as the limit that is free today, but it will matter once the encoder is faster.
 - Find what makes `ImageRenderer.cgImage` differ on first draws, or drop it as the default in favour of `core-animation`, which is as fast, uses far less resident memory and is pure, at the price of leaning on undocumented behaviour.
-- Text is still rasterised on the CPU into `CGDrawingLayer` bitmaps. It is cheap in both scenes here; a scene with far more changing text would show whether that becomes the draw bottleneck.
+- Text is still rasterised on the CPU into `CGDrawingLayer` bitmaps. It is cheap here; a scene with far more changing text would show whether that becomes the draw bottleneck.
 - Scenes that are harder for Core Animation: blurs, masks, `drawingGroup()`, images, and whether each survives `CARenderer` offscreen.
 - ProRes and transparent output; motion blur by averaging sub-frame samples; audio.
