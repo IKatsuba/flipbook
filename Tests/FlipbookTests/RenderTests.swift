@@ -44,3 +44,12 @@ func scratch(_ name: String) -> URL {
     #expect(image.width == 320)
     #expect(image.height == 180)
 }
+
+@MainActor @Test func progressCountsEveryFrame() async throws {
+    var seen: [Int] = []
+    try await sample().video(to: scratch("progress.mp4"), range: 4..<10) { done, total in
+        #expect(total == 6)
+        seen.append(done)
+    }
+    #expect(seen == [1, 2, 3, 4, 5, 6])
+}

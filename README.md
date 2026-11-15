@@ -10,6 +10,7 @@ let comp = Composition(width: 1080, height: 1350, fps: 60, frames: 360, scale: 2
         .opacity(frame.interpolate([0, 20], [0, 1], easing: .easeOut))
 }
 try await comp.video(to: URL(filePath: "out/demo.mp4"), codec: .hevc)
+try await comp.video(to: URL(filePath: "out/part.mp4"), range: 60..<150) { done, total in print("\(done)/\(total)") }
 let image = try comp.still(at: 42)
 try comp.still(at: 42, to: URL(filePath: "out/frame.png"))
 ```

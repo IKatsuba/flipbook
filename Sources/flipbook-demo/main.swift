@@ -159,7 +159,11 @@ do {
         // --from and --to render part of the timeline.
         let from = Int(arguments.options["from"] ?? "") ?? 0
         let to = Int(arguments.options["to"] ?? "") ?? composition.frames
-        let stats = try await composition.video(to: url, codec: arguments.codec, path: path, range: from..<to, prioritizeSpeed: arguments.speed)
+        let stats = try await composition.video(to: url, codec: arguments.codec, path: path, range: from..<to, prioritizeSpeed: arguments.speed) { done, total in
+            // A line that rewrites itself, when someone is watching.
+            guard isatty(STDERR_FILENO) != 0, done % 30 == 0 || done == total else { return }
+            FileHandle.standardError.write(Data("\r\(done)/\(total) frames\(done == total ? "\n" : "")".utf8))
+        }
         print("\(url.path): \(summary(stats)), \(fileSize(url)) bytes")
 
     case "still":
