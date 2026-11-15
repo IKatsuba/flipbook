@@ -1,10 +1,14 @@
 import Flipbook
 import SwiftUI
 
+/// The demo is a page of a flip book: ruled paper, ink, one red.
 enum Palette {
-    static let background = Color(red: 0.039, green: 0.039, blue: 0.059)
-    static let pink = Color(red: 1.0, green: 0.31, blue: 0.64)
-    static let dim = Color.white.opacity(0.55)
+    static let paper = Color(red: 0.949, green: 0.925, blue: 0.882)
+    static let paperTop = Color(red: 0.965, green: 0.945, blue: 0.906)
+    static let paperBottom = Color(red: 0.929, green: 0.902, blue: 0.847)
+    static let ink = Color(red: 0.106, green: 0.098, blue: 0.082)
+    static let red = Color(red: 0.898, green: 0.263, blue: 0.169)
+    static let dim = ink.opacity(0.58)
 }
 
 struct Backdrop: View {
@@ -12,23 +16,19 @@ struct Backdrop: View {
 
     var body: some View {
         ZStack {
-            Palette.background
-            RadialGradient(
-                colors: [Palette.pink.opacity(0.22), .clear],
-                center: UnitPoint(x: 0.85, y: 0.1), startRadius: 0, endRadius: 900
-            )
+            LinearGradient(colors: [Palette.paperTop, Palette.paperBottom], startPoint: .top, endPoint: .bottom)
+            // Ruled lines and a margin, as in an exercise book.
             Canvas(rendersAsynchronously: false) { context, size in
-                var lines = Path()
-                let step = 54.0
-                for x in stride(from: 0.0, through: size.width, by: step) {
-                    lines.move(to: CGPoint(x: x, y: 0))
-                    lines.addLine(to: CGPoint(x: x, y: size.height))
+                var rules = Path()
+                for y in stride(from: 54.0, through: size.height, by: 54) {
+                    rules.move(to: CGPoint(x: 0, y: y))
+                    rules.addLine(to: CGPoint(x: size.width, y: y))
                 }
-                for y in stride(from: 0.0, through: size.height, by: step) {
-                    lines.move(to: CGPoint(x: 0, y: y))
-                    lines.addLine(to: CGPoint(x: size.width, y: y))
-                }
-                context.stroke(lines, with: .color(.white.opacity(0.06)), lineWidth: 1)
+                context.stroke(rules, with: .color(Palette.ink.opacity(0.07)), lineWidth: 1)
+                var margin = Path()
+                margin.move(to: CGPoint(x: 60, y: 0))
+                margin.addLine(to: CGPoint(x: 60, y: size.height))
+                context.stroke(margin, with: .color(Palette.red.opacity(0.35)), lineWidth: 1.5)
             }
             .opacity(frame.interpolate([0, 40], [0, 1], easing: .easeOut))
         }
@@ -40,18 +40,18 @@ struct Headline: View {
     let accent: String
     let frame: Frame
 
-    static let font = Font.system(size: 150, weight: .heavy)
+    static let font = Font.system(size: 132, weight: .bold, design: .serif)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: -18) {
-            // "Make" rides a spring up into place.
+        VStack(alignment: .leading, spacing: -10) {
+            // The first line rides a spring up into place.
             let rise = frame.spring(from: 30, stiffness: 120, damping: 14, settle: 60)
             Text(title)
-                .foregroundStyle(.white)
+                .foregroundStyle(Palette.ink)
                 .offset(y: frame.snap(90 * (1 - rise)))
                 .opacity(frame.interpolate([30, 48], [0, 1], easing: .easeOut))
 
-            // "changelogs" is typed, one character every four frames.
+            // The second is typed, one character every four frames.
             let typed = frame.typed(accent, from: 70, per: 4).count
             let typing = typed < accent.count
             let cursorOn = typing || frame.loop(duration: 60).index < 30
@@ -62,20 +62,20 @@ struct Headline: View {
                         .hidden()
                         .overlay(alignment: .trailing) {
                             Rectangle()
-                                .fill(Palette.pink)
-                                .frame(width: 10, height: 132)
-                                .offset(x: 18)
+                                .fill(Palette.red)
+                                .frame(width: 8, height: 118)
+                                .offset(x: 16)
                                 .opacity(frame.index >= 60 && cursorOn ? 1 : 0)
                         }
                 }
         }
         .font(Headline.font)
-        .tracking(-5)
+        .tracking(-3)
     }
 
     private func typedText(_ text: String, count: Int) -> Text {
         var string = AttributedString(text)
-        string.foregroundColor = Palette.pink
+        string.foregroundColor = Palette.red
         if count < text.count {
             let cut = string.index(string.startIndex, offsetByCharacters: count)
             string[cut...].foregroundColor = .clear
@@ -97,50 +97,56 @@ struct Card: View {
         ZStack(alignment: .leading) {
             if showsBackdrop { Backdrop(frame: frame) }
 
-            VStack(alignment: .leading, spacing: 36) {
-                Text("NEW · plugins/render")
-                    .font(.system(size: 30, weight: .medium, design: .monospaced))
-                    .tracking(3)
-                    .foregroundStyle(Palette.dim)
+            VStack(alignment: .leading, spacing: 30) {
+                Text("FLIPBOOK · DEMO")
+                    .font(.system(size: 28, weight: .semibold, design: .monospaced))
+                    .tracking(5)
+                    .foregroundStyle(Palette.red)
                     .opacity(frame.interpolate([10, 30], [0, 1], easing: .easeOut))
                     .offset(x: frame.snap(frame.interpolate([10, 30], [-24, 0], easing: .easeOut)))
 
                 Headline(title: title, accent: accent, frame: frame)
             }
-            .padding(.horizontal, 84)
+            .padding(.horizontal, 96)
 
+            // The foot of the page: how far through, and the page number, which is the frame.
             VStack(alignment: .leading, spacing: 18) {
                 Spacer()
                 Rectangle()
-                    .fill(.white.opacity(0.12))
+                    .fill(Palette.ink.opacity(0.14))
                     .frame(height: 2)
                     .overlay(alignment: .leading) {
-                        Rectangle().fill(Palette.pink).frame(width: (1080 - 168) * frame.progress)
+                        Rectangle().fill(Palette.red).frame(width: (1080 - 192) * frame.progress)
                     }
-                Text("flipbook · frame \(String(format: "%03d", frame.index)) · \(String(format: "%.2f", frame.time))s")
-                    .font(.system(size: 22, design: .monospaced))
-                    .foregroundStyle(Palette.dim)
+                HStack {
+                    Text(String(format: "%.2f s", frame.time))
+                    Spacer()
+                    Text(String(format: "p. %03d", frame.index))
+                }
+                .font(.system(size: 22, weight: .medium, design: .monospaced))
+                .foregroundStyle(Palette.dim)
             }
-            .padding(84)
+            .padding(.horizontal, 96)
+            .padding(.vertical, 84)
             .opacity(frame.interpolate([20, 40], [0, 1]))
         }
-        // Fade the whole card up from black.
+        // Fade the whole page up from blank paper.
         .opacity(Card.fade(frame))
-        .background(showsBackdrop ? Color.black : .clear)
+        .background(showsBackdrop ? Palette.paper : .clear)
     }
 }
 
-/// The backdrop again, as a fragment shader: same colours, glow and grid.
+/// The backdrop again, as a fragment shader: the same paper, rules and margin.
 let metalBackdrop = MetalBackdrop(
     source: """
     float4 backdrop(float2 point, Uniforms u) {
-        float3 color = float3(0.039, 0.039, 0.059);
-        float glow = 0.22 * saturate(1.0 - distance(point, float2(0.85, 0.1) * u.size) / 900.0);
-        color = mix(color, float3(1.0, 0.31, 0.64), glow);
-        float2 cell = fmod(point + 0.5, 54.0);
-        float line = (cell.x < 1.0 || cell.y < 1.0) ? 0.06 * u.params[1] : 0.0;
-        color = mix(color, float3(1.0), line);
-        return float4(color * u.params[0], 1.0);
+        float3 blank = float3(0.949, 0.925, 0.882);
+        float3 color = mix(float3(0.965, 0.945, 0.906), float3(0.929, 0.902, 0.847), point.y / u.size.y);
+        float rule = (point.y > 53.0 && fmod(point.y + 0.5, 54.0) < 1.0) ? 0.07 * u.params[1] : 0.0;
+        color = mix(color, float3(0.106, 0.098, 0.082), rule);
+        float margin = (fabs(point.x - 60.0) < 0.75) ? 0.35 * u.params[1] : 0.0;
+        color = mix(color, float3(0.898, 0.263, 0.169), margin);
+        return float4(mix(blank, color, u.params[0]), 1.0);
     }
     """,
     params: { frame in
@@ -154,7 +160,7 @@ func demoComposition(
     transparent: Bool = false
 ) -> Composition<Card> {
     var composition = Composition(width: width, height: height, fps: 60, frames: frames, scale: scale) { frame in
-        Card(title: "Make", accent: "changelogs", frame: frame, showsBackdrop: !useMetal && !transparent)
+        Card(title: "Every frame", accent: "on its own.", frame: frame, showsBackdrop: !useMetal && !transparent)
     }
     composition.transparent = transparent
     if useMetal { composition.backdrop = metalBackdrop }
