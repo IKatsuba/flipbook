@@ -5,7 +5,7 @@ import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
-// flipbook-demo [render|still|verify|hashes|bench] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n]
+// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m]
 
 struct Arguments {
     var command = "render"
@@ -146,57 +146,83 @@ let arguments = Arguments(Array(CommandLine.arguments.dropFirst()))
 _ = NSApplication.shared
 
 do {
-    let composition = demoComposition(scale: arguments.scale, frames: arguments.frames)
+    let path = arguments.path
+    let useMetal = path == .metalComposite
+    let composition = demoComposition(scale: arguments.scale, frames: arguments.frames, metalBackdrop: useMetal)
     switch arguments.command {
     case "render":
         let url = arguments.url("out/demo.mp4")
-        let stats = try await composition.video(to: url, codec: arguments.codec, path: arguments.path)
+        let stats = try await composition.video(to: url, codec: arguments.codec, path: path)
         print("\(url.path): \(summary(stats)), \(fileSize(url)) bytes")
 
     case "still":
         let index = Int(arguments.options["frame"] ?? "") ?? 120
         let url = arguments.url("out/still-\(index).png")
-        try writePNG(try composition.still(at: index, path: arguments.path), to: url)
+        try writePNG(try composition.still(at: index, path: path), to: url)
         print(url.path)
 
+    case "layers":
+        // What SwiftUI hands to Core Animation for one frame.
+        print(try composition.layerTree(at: Int(arguments.options["frame"] ?? "") ?? 120))
+
     case "hashes":
-        // One hash per line, for comparing separate processes.
+        // "index hash" per line, for comparing separate processes.
         let from = Int(arguments.options["from"] ?? "") ?? 0
-        for _ in 0..<(Int(arguments.options["passes"] ?? "") ?? 1) {
-            let stats = try await composition.hashes(path: arguments.path, range: from..<composition.frames)
-            print(stats.hashes.enumerated().map { "\($0.offset + from) \($0.element)" }.joined(separator: "\n"))
-        }
+        let stats = try await composition.hashes(path: path, range: from..<composition.frames)
+        print(stats.hashes.enumerated().map { "\($0.offset + from) \($0.element)" }.joined(separator: "\n"))
 
     case "verify":
-        // Two renders, each with its own renderer, compared frame by frame.
-        let first = try await composition.hashes(path: arguments.path).hashes
-        let second = try await composition.hashes(path: arguments.path).hashes
-        let different = zip(first, second).enumerated().filter { $0.element.0 != $0.element.1 }.map(\.offset)
-        let distinct = Set(first).count
-        print("\(arguments.path.rawValue) @\(arguments.scale)x: \(first.count) frames, \(distinct) distinct, \(different.count) differ between two renders")
-        if !different.isEmpty {
-            print("differing frames: \(different.prefix(20).map(String.init).joined(separator: " "))")
-            exit(2)
-        }
+        // Two full renders, each with its own renderer, compared frame by frame;
+        // then a render that starts in the middle, which must not change what a frame looks like.
+        let first = try await composition.hashes(path: path).hashes
+        let second = try await composition.hashes(path: path).hashes
+        let repeated = first.indices.filter { first[$0] != second[$0] }
+        let middle = composition.frames / 3
+        let partial = try await composition.hashes(path: path, range: middle..<composition.frames).hashes
+        let shifted = partial.indices.filter { partial[$0] != second[$0 + middle] }.map { $0 + middle }
+        let list = { (frames: [Int]) in frames.isEmpty ? "" : " (frames \(frames.prefix(12).map(String.init).joined(separator: " ")))" }
+        print("\(path.rawValue) @\(arguments.scale)x: \(first.count) frames, \(Set(first).count) distinct")
+        print("  rendered twice in one process: \(repeated.count) frames differ\(list(repeated))")
+        print("  rendered from frame \(middle) instead of 0: \(shifted.count) frames differ\(list(shifted))")
+        if !repeated.isEmpty || !shifted.isEmpty { exit(2) }
 
     case "diff":
-        try diffPasses(composition, path: arguments.path, range: 0..<min(arguments.frames, 60))
+        try diffPasses(composition, path: path, range: 0..<min(arguments.frames, 60))
 
     case "cross":
-        try crossCheck(composition, path: arguments.path, reference: .imageRenderer, range: 60..<min(arguments.frames, 120))
+        try crossCheck(composition, path: path, reference: .imageRenderer, range: 60..<min(arguments.frames, 120))
 
     case "bench":
-        // Warm up SwiftUI, the glyph caches and the encoder, then measure one full render.
+        // Warm up SwiftUI, the glyph caches, the shaders and the encoder, then measure one full render.
+        // --mode video (default) | draw (no encoder) | encoder (encoder alone, frames rendered beforehand)
+        let mode = arguments.options["mode"] ?? "video"
         let scratch = FileManager.default.temporaryDirectory.appending(path: "flipbook-bench-\(getpid()).mp4")
         defer { try? FileManager.default.removeItem(at: scratch) }
-        let warmup = demoComposition(scale: arguments.scale, frames: 30)
-        _ = try await warmup.video(to: scratch, codec: arguments.codec, path: arguments.path)
+        let warmup = demoComposition(scale: arguments.scale, frames: 30, metalBackdrop: useMetal)
+        _ = try await warmup.video(to: scratch, codec: arguments.codec, path: path)
 
+        let clock = ContinuousClock()
         let cpuBefore = cpuSeconds()
-        let stats = try await composition.video(to: scratch, codec: arguments.codec, path: arguments.path)
+        var stats: RenderStats
+        switch mode {
+        case "video":
+            stats = try await composition.video(to: scratch, codec: arguments.codec, path: path)
+        case "draw":
+            stats = RenderStats(frames: composition.frames, width: composition.pixelWidth, height: composition.pixelHeight)
+            let start = clock.now
+            try composition.forEachFrame(path: path) { _, _ in }
+            let elapsed = (clock.now - start).components
+            stats.totalSeconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) * 1e-18
+            stats.drawSeconds = stats.totalSeconds
+        case "encoder":
+            stats = try await composition.encoderCeiling(to: scratch, codec: arguments.codec)
+        default:
+            fail("unknown mode \(mode)")
+        }
         let cpu = cpuSeconds() - cpuBefore
         let result: [String: Any] = [
-            "path": arguments.path.rawValue,
+            "path": mode == "encoder" ? "encoder" : path.rawValue,
+            "mode": mode,
             "scale": arguments.scale,
             "codec": arguments.codec.rawValue,
             "frames": stats.frames,
@@ -209,7 +235,7 @@ do {
             "appendMsPerFrame": stats.appendSeconds / Double(stats.frames) * 1000,
             "finishMs": stats.finishSeconds * 1000,
             "peakRSS": peakRSS(),
-            "bytes": fileSize(scratch),
+            "bytes": mode == "draw" ? 0 : fileSize(scratch),
         ]
         let json = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
         print(String(decoding: json, as: UTF8.self))

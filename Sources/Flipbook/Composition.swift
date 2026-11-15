@@ -79,7 +79,7 @@ public enum RenderPath: String, Sendable, CaseIterable {
     case imageRendererDirect = "image-renderer-direct"
     /// An offscreen `NSHostingView` whose layer tree `CARenderer` draws into the pixel buffer's IOSurface.
     case coreAnimation = "core-animation"
-    /// `Composition.backdrop` in a Metal shader, with the SwiftUI content composited over it by Core Animation.
+    /// `Composition.backdrop` in a Metal shader, with the SwiftUI content drawn over it by Core Animation.
     case metalComposite = "metal-composite"
 }
 

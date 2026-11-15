@@ -134,13 +134,17 @@ struct Headline: View {
 }
 
 struct Card: View {
+    static func fade(_ frame: Frame) -> Double { frame.interpolate([0, 12], [0, 1], easing: .easeOut) }
+
     var title: String
     var accent: String
     var frame: Frame
+    /// Off when a Metal backdrop is drawn underneath instead.
+    var showsBackdrop = true
 
     var body: some View {
         ZStack(alignment: .leading) {
-            Backdrop(frame: frame)
+            if showsBackdrop { Backdrop(frame: frame) }
 
             VStack(alignment: .leading, spacing: 36) {
                 Text("NEW · plugins/render")
@@ -170,16 +174,45 @@ struct Card: View {
             .opacity(frame.interpolate([20, 40], [0, 1]))
         }
         // Fade the whole card up from black.
-        .opacity(frame.interpolate([0, 12], [0, 1], easing: .easeOut))
-        .background(.black)
+        .opacity(Card.fade(frame))
+        .background(showsBackdrop ? Color.black : .clear)
     }
 }
 
+/// The backdrop again, as a fragment shader: same colours, glow and grid, and hashed noise for grain.
+let metalBackdrop = MetalBackdrop(
+    source: """
+    static float grain(uint2 p, uint frame) {
+        uint h = p.x * 374761393u + p.y * 668265263u + frame * 2246822519u;
+        h = (h ^ (h >> 13)) * 1274126177u;
+        h ^= h >> 16;
+        return float(h % 40u) / 255.0;
+    }
+
+    float4 backdrop(float2 point, Uniforms u) {
+        float3 color = float3(0.039, 0.039, 0.059);
+        float glow = 0.22 * saturate(1.0 - distance(point, float2(0.85, 0.1) * u.size) / 900.0);
+        color = mix(color, float3(1.0, 0.31, 0.64), glow);
+        float2 cell = fmod(point + 0.5, 54.0);
+        float line = (cell.x < 1.0 || cell.y < 1.0) ? 0.06 * u.params[1] : 0.0;
+        color = mix(color, float3(1.0), line);
+        float noise = grain(uint2(point), uint(u.frame));
+        color = color * (1.0 - noise) + noise;
+        return float4(color * u.params[0], 1.0);
+    }
+    """,
+    params: { frame in
+        [Float(Card.fade(frame)), Float(frame.interpolate([0, 40], [0, 1], easing: .easeOut))]
+    }
+)
+
 @MainActor
-func demoComposition(scale: Int, frames: Int = 360) -> Composition<Card> {
+func demoComposition(scale: Int, frames: Int = 360, metalBackdrop useMetal: Bool = false) -> Composition<Card> {
     // Touch the grain before the first frame: nothing may be loaded lazily mid-render.
     _ = Grain.tile
-    return Composition(width: 1080, height: 1350, fps: 60, frames: frames, scale: scale) { frame in
-        Card(title: "Make", accent: "changelogs", frame: frame)
+    var composition = Composition(width: 1080, height: 1350, fps: 60, frames: frames, scale: scale) { frame in
+        Card(title: "Make", accent: "changelogs", frame: frame, showsBackdrop: !useMetal)
     }
+    if useMetal { composition.backdrop = metalBackdrop }
+    return composition
 }

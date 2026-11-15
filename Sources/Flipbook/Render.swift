@@ -18,6 +18,12 @@ public struct RenderStats: Sendable, Codable {
     public var totalSeconds = 0.0
     public var hashes: [String] = []
 
+    public init(frames: Int = 0, width: Int = 0, height: Int = 0) {
+        self.frames = frames
+        pixelWidth = width
+        pixelHeight = height
+    }
+
     public var framesPerSecond: Double { totalSeconds > 0 ? Double(frames) / totalSeconds : 0 }
 }
 
@@ -67,7 +73,7 @@ extension Composition {
     func run(renderer: any FrameRenderer, sink: VideoSink?, range: Range<Int>, hashFrames: Bool) async throws -> RenderStats {
         let clock = ContinuousClock()
         let pool = sink == nil ? try PixelBuffers.makePool(width: pixelWidth, height: pixelHeight) : nil
-        var stats = RenderStats(frames: range.count, pixelWidth: pixelWidth, pixelHeight: pixelHeight)
+        var stats = RenderStats(frames: range.count, width: pixelWidth, height: pixelHeight)
         let start = clock.now
 
         for index in range {
@@ -122,5 +128,33 @@ extension Composition {
         let path = try CoreAnimationPath(self)
         try path.draw(index, to: path.placeholder)
         return path.layerTree
+    }
+}
+
+extension Composition {
+    /// A measurement helper: how fast the encoder alone takes this composition's frames.
+    /// Renders `distinct` consecutive frames up front, then times encoding `frames` frames that cycle through them.
+    public func encoderCeiling(to url: URL, codec: Codec = .hevc, path: RenderPath = .coreAnimation, distinct: Int = 30) async throws -> RenderStats {
+        let renderer = try makeRenderer(path)
+        let pool = try PixelBuffers.makePool(width: pixelWidth, height: pixelHeight)
+        let start = frames / 2
+        let buffers = try (0..<distinct).map { offset in
+            let buffer = try PixelBuffers.make(from: pool)
+            try renderer.render(start + offset, into: buffer)
+            return buffer
+        }
+        let clock = ContinuousClock()
+        var stats = RenderStats(frames: frames, width: pixelWidth, height: pixelHeight)
+        let sink = try VideoSink(url: url, width: pixelWidth, height: pixelHeight, fps: fps, codec: codec, bitrate: nil)
+        let begin = clock.now
+        for index in 0..<frames {
+            try await sink.append(buffers[index % distinct], frame: index)
+        }
+        stats.appendSeconds = (clock.now - begin).seconds
+        let mark = clock.now
+        try await sink.finish(frames: frames)
+        stats.finishSeconds = (clock.now - mark).seconds
+        stats.totalSeconds = (clock.now - begin).seconds
+        return stats
     }
 }
