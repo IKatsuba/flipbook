@@ -1,3 +1,4 @@
+import SwiftUI
 import Testing
 @testable import Flipbook
 
@@ -78,4 +79,25 @@ import Testing
     #expect(f(14).typed("héllo 👋", from: 10) == "hé")
     #expect(f(99).typed("héllo 👋", from: 10) == "héllo 👋")
     #expect(f(3).typed("abc", per: 0.5) == "abc")
+}
+
+@Test func coloursInterpolatePerChannel() {
+    let grey = Frame(index: 5, fps: 60, frames: 11).interpolate([0, 10], [.black, .white])
+    let resolved = grey.resolve(in: EnvironmentValues())
+    #expect(abs(resolved.red - 0.5) < 0.01 && abs(resolved.green - 0.5) < 0.01 && abs(resolved.blue - 0.5) < 0.01)
+    #expect(resolved.opacity == 1)
+    let clear = Frame(index: 20, fps: 60, frames: 21).interpolate([0, 10], [Color.red, Color.red.opacity(0)])
+    #expect(clear.resolve(in: EnvironmentValues()).opacity == 0)
+}
+
+@Test func fadeRisesHoldsAndFalls() {
+    let f = { Frame(index: $0, fps: 60, frames: 100) }
+    #expect(f(0).fade(in: 10, out: 20) == 0)
+    #expect(f(5).fade(in: 10, out: 20) == 0.5)
+    #expect(f(50).fade(in: 10, out: 20) == 1)
+    #expect(f(89).fade(in: 10, out: 20) == 0.5)
+    #expect(f(99).fade(in: 10, out: 20) == 0)
+    #expect(f(0).fade() == 1)
+    // Inside a sequence it follows the sequence's own length.
+    #expect(f(49).sequence(from: 10, duration: 40)?.fade(out: 10) == 0)
 }
