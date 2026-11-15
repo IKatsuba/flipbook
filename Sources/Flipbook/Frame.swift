@@ -66,15 +66,25 @@ public struct Frame: Sendable, Equatable {
 
     /// A damped spring going from 0 to 1, released at frame `from` and solved in closed form,
     /// so frame N has the same value however it is reached.
+    ///
+    /// A spring never quite arrives: its tail keeps moving by less than a pixel, and whatever is
+    /// positioned with it hops between pixels long after it looks still. `settle` bends the curve
+    /// to be exactly 1 that many frames after release, and from then on.
     public func spring(
         from start: Int = 0,
         mass: Double = 1,
         stiffness: Double = 100,
         damping: Double = 10,
-        initialVelocity: Double = 0
+        initialVelocity: Double = 0,
+        settle: Int? = nil
     ) -> Double {
-        let t = Double(index - start) / Double(fps)
-        return Frame.springValue(at: t, mass: mass, stiffness: stiffness, damping: damping, initialVelocity: initialVelocity)
+        let value = { (frames: Int) in
+            Frame.springValue(at: Double(frames) / Double(fps), mass: mass, stiffness: stiffness, damping: damping, initialVelocity: initialVelocity)
+        }
+        let local = index - start
+        guard let settle, local > 0 else { return value(local) }
+        guard local < settle else { return 1 }
+        return value(local) + (1 - value(settle)) * Double(local) / Double(settle)
     }
 
     public static func springValue(

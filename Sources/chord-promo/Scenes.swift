@@ -66,7 +66,7 @@ struct PickerScene: View {
                 LineView(line: .blank)
                 LineView(line: Line(dim("↑↓ or j/k to move · Enter or 1-9 to select · Esc to cancel")))
             }
-            .frame(width: 720)
+            .frame(width: Stage.vertical ? 760 : 720)
         }
         .frame(maxWidth: .infinity)
     }
@@ -87,7 +87,7 @@ struct DiffScene: View {
             Lines(lines: transcript(i))
             Spacer(minLength: 0)
             PromptBox(text: i < Self.sent ? typed(Self.prompt, frame, from: 12) : "", cursor: frame.loop(duration: 60).index < 36 || i < Self.sent)
-            StatusRow().padding(.top, 8)
+            StatusRow(right: Stage.vertical ? "Claude Opus 5.5 · medium effort" : "Claude Opus 5.5 · medium effort · ~1% context used").padding(.top, 8)
         }
     }
 
@@ -138,7 +138,7 @@ struct PermissionScene: View {
                 LineView(line: Line(s("››› Waiting for permission… ", Theme.accent), dim("(\(seconds)s)")))
                     .padding(.bottom, 26)
                 box(pressed: i >= Self.answered)
-                    .offset(y: 30 * (1 - frame.spring(from: Self.asked, stiffness: 200, damping: 22)))
+                    .offset(y: Stage.px(30 * (1 - frame.spring(from: Self.asked, stiffness: 200, damping: 22, settle: 30))))
                     .opacity(frame.interpolate([Double(Self.asked), Double(Self.asked + 8)], [0, 1]))
                     .padding(.bottom, 26)
             }
@@ -195,7 +195,7 @@ struct TeamScene: View {
             Lines(lines: transcript(i))
             Spacer(minLength: 0)
             PromptBox(text: i < Self.sent ? typed(Self.prompt, frame, from: 8) : "", cursor: true)
-            StatusRow(left: status(i), right: "Claude Opus 5.5 · medium · ~1% used").padding(.top, 8)
+            StatusRow(left: status(i), right: Stage.vertical ? "~1% used" : "Claude Opus 5.5 · medium · ~1% used").padding(.top, 8)
             Lines(lines: agents(i)).padding(.horizontal, 16)
         }
         .padding(.top, 8)
@@ -206,14 +206,14 @@ struct TeamScene: View {
         var lines: [Line] = [Line(dim("› "), s(Self.prompt)), .blank]
         guard i >= Self.handed else { return lines }
         lines.append(Line(s("● ", Theme.success), s("Team", bold: true), s("(bugfix)"), dim(" · claude · claude-opus-5-5")))
-        for (row, text) in wrap(Self.job, width: 112).enumerated() {
+        for (row, text) in wrap(Self.job, width: Stage.columns - 10).enumerated() {
             lines.append(Line(dim((row == 0 ? "  └  " : "     ") + text)))
         }
         guard i >= Self.started else { return lines }
         lines += [.blank, Line(s("● "), s("bugfix has the job. Its lead will report here; you can look in with ↓."))]
         guard i >= Self.reported else { return lines }
         lines += [.blank, Line(s("← ", Theme.link), dim("from "), s("@bugfix", Theme.link, bold: true), dim(" · claude"))]
-        for (row, text) in wrap(Self.report, width: 112).enumerated() {
+        for (row, text) in wrap(Self.report, width: Stage.columns - 10).enumerated() {
             lines.append(Line(dim((row == 0 ? "  └  " : "     ") + text)))
         }
         return lines
@@ -221,7 +221,7 @@ struct TeamScene: View {
 
     func status(_ i: Int) -> [Seg] {
         guard i >= Self.asked else { return [dim("? for shortcuts")] }
-        return [s("● tester needs your permission · ctrl+x a to go", Theme.warning), dim(" · ? for shortcuts")]
+        return [s("● tester needs your permission · ctrl+x a to go", Theme.warning), dim(Stage.vertical ? "" : " · ? for shortcuts")]
     }
 
     /// The agents list under the prompt: main, then the team and its members as they start.
@@ -231,22 +231,24 @@ struct TeamScene: View {
             let label = (tree + name).padding(toLength: 13, withPad: " ", startingAt: 0)
             return Line(
                 dim(String(label.prefix(tree.count))), s(String(label.dropFirst(tree.count)), colour, bold: bold),
-                dim(what.padding(toLength: 46, withPad: " ", startingAt: 0)),
-                Seg(text: state.text.padding(toLength: 18, withPad: " ", startingAt: 0), color: state.color), dim(news)
+                dim(what.padding(toLength: Stage.vertical ? 33 : 46, withPad: " ", startingAt: 0)),
+                Seg(text: state.text.padding(toLength: Stage.vertical ? 16 : 18, withPad: " ", startingAt: 0), color: state.color), dim(news)
             )
         }
         let working = { (start: Int) in s("✻ working \(seconds(since: start))", Theme.accent) }
         let idle = { (start: Int) in dim("◦ idle \(seconds(since: start))") }
 
-        var lines = [row("", "main", Theme.text, "claude · Claude Opus 5.5 · medium", i >= Self.sent && i < Self.started ? working(Self.sent) : idle(i < Self.sent ? -480 : Self.started), bold: true)]
+        // A narrow window has no room for the effort.
+        let main = Stage.vertical ? "claude · Claude Opus 5.5" : "claude · Claude Opus 5.5 · medium"
+        var lines = [row("", "main", Theme.text, main, i >= Self.sent && i < Self.started ? working(Self.sent) : idle(i < Self.sent ? -480 : Self.started), bold: true)]
         guard i >= Self.started else { return lines }
-        let claude = "claude · Claude Opus 5.5 · medium"
+        let claude = main
         lines.append(row("", "bugfix", Theme.agents[0], "team · " + claude, i < Self.reported ? working(Self.started) : idle(Self.reported), i >= Self.reported ? "✓ new reply" : ""))
         if i >= Self.started + 10 {
             let asking = i >= Self.asked
             lines.append(row("├─ ", "tester", Theme.agents[1], claude, asking ? s("● permission \(seconds(since: Self.asked))", Theme.warning) : working(Self.started + 10), asking ? "← new message" : ""))
         }
-        if i >= Self.started + 18 { lines.append(row("├─ ", "coder", Theme.agents[2], "codex · GPT-6.1 Sol · medium", idle(Self.started + 18))) }
+        if i >= Self.started + 18 { lines.append(row("├─ ", "coder", Theme.agents[2], Stage.vertical ? "codex · GPT-6.1 Sol" : "codex · GPT-6.1 Sol · medium", idle(Self.started + 18))) }
         if i >= Self.started + 26 { lines.append(row("└─ ", "reviewer", Theme.agents[3], claude, idle(Self.started + 26))) }
         return lines
     }

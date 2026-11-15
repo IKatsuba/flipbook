@@ -43,6 +43,19 @@ enum Theme {
     static let monoBold = Font.custom("JetBrainsMono-Bold", fixedSize: fontSize)
 }
 
+/// The shape of the video: 1920×1080, or 1080×1920 with a narrower terminal and the caption above it.
+/// Set once, before the composition is made.
+enum Stage {
+    nonisolated(unsafe) static var vertical = false
+    static var size: CGSize { vertical ? CGSize(width: 1080, height: 1920) : CGSize(width: 1920, height: 1080) }
+    nonisolated(unsafe) static var scale = 1
+    /// A length snapped to whole pixels. Text layers sit on whole pixels anyway; an offset that is
+    /// not would make them round one way while moving and the other at rest.
+    static func px(_ points: Double) -> CGFloat { CGFloat((points * Double(scale)).rounded() / Double(scale)) }
+    /// Terminal columns inside the window.
+    static var columns: Int { vertical ? 77 : 122 }
+}
+
 /// A run of terminal text in one style.
 struct Seg {
     var text: String
@@ -156,7 +169,7 @@ struct StatusRow: View {
 struct TerminalWindow<Content: View>: View {
     @ViewBuilder var content: Content
 
-    static var size: CGSize { CGSize(width: 1560, height: 830) }
+    static var size: CGSize { Stage.vertical ? CGSize(width: 1000, height: 1180) : CGSize(width: 1560, height: 830) }
 
     var body: some View {
         VStack(spacing: 0) {

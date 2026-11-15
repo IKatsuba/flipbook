@@ -45,7 +45,7 @@ struct Headline: View {
     var body: some View {
         VStack(alignment: .leading, spacing: -18) {
             // "Make" rides a spring up into place.
-            let rise = frame.spring(from: 30, stiffness: 120, damping: 14)
+            let rise = frame.spring(from: 30, stiffness: 120, damping: 14, settle: 60)
             Text(title)
                 .foregroundStyle(.white)
                 .offset(y: 90 * (1 - rise))

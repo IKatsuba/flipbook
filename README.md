@@ -13,7 +13,7 @@ try await comp.video(to: URL(filePath: "out/demo.mp4"), codec: .hevc)
 let image = try comp.still(at: 42)
 ```
 
-`width` and `height` are points; the video is `width × scale` by `height × scale` pixels (MyGo counts the other way round: pixels, divided by the scale). `Frame` has `index`, `time`, `progress`, `interpolate` (piecewise, with easing), `spring` (a damped spring in closed form, checked in the tests against fixed-step integration), `sequence(from:duration:)`, `shift(by:)` and `loop(duration:)`.
+`width` and `height` are points; the video is `width × scale` by `height × scale` pixels (MyGo counts the other way round: pixels, divided by the scale). `Frame` has `index`, `time`, `progress`, `interpolate` (piecewise, with easing), `spring` (a damped spring in closed form, checked in the tests against fixed-step integration, with `settle:` to make it arrive exactly after a number of frames), `sequence(from:duration:)`, `shift(by:)` and `loop(duration:)`.
 
 The rule for views: depend on the frame and nothing else. No `withAnimation`, no `.animation`, no `Date()`, no `TimelineView`, and load fonts and images before rendering. Flipbook disables animations in the transaction of every frame, but cannot stop a view from reading a clock.
 
@@ -128,7 +128,9 @@ The other three paths passed every check, so on this machine their frames are a 
 
 ## A longer example: chord-promo
 
-`swift run -c release chord-promo` writes `out/chord-promo.mp4`: a 29 second, 1920×1080, 60 fps promo for [chord](https://github.com/IKatsuba/chord), with `--scale 2` for 3840×2160. It is one `Composition` of six scenes cut with `frame.sequence`: the logo, the agent picker, a diff, a permission prompt, a team at work and the install line. The terminal is rebuilt in SwiftUI from chord's own theme colours, pixel mark and screenshots, set in JetBrains Mono, which must be installed. It renders through `core-animation` at about 190 fps for 1080p and 52 fps for 4K, shadows and all. There is no sound: Flipbook does not do audio.
+`swift run -c release chord-promo` writes `out/chord-promo.mp4`: a 29 second, 1920×1080, 60 fps promo for [chord](https://github.com/IKatsuba/chord). `--vertical 1` writes a 1080×1920 version with a narrower terminal and the caption above it, and `--scale 2` doubles either. It is one `Composition` of six scenes cut with `frame.sequence`: the logo, the agent picker, a diff, a permission prompt, a team at work and the install line. The terminal is rebuilt in SwiftUI from chord's own theme colours, pixel mark and screenshots, set in JetBrains Mono, which must be installed. It renders through `core-animation` at about 190 fps for 1080p and 52 fps for 4K, shadows and all. There is no sound: Flipbook does not do audio.
+
+One thing it taught: at 1x, text that is moved by a spring keeps hopping by a pixel long after it looks still. A spring's tail never reaches 1, SwiftUI puts every text layer on whole pixels, and a resting position that falls on half a pixel rounds one way with a tiny offset and the other way without it. `chord-promo probe` showed the caption going 970, 971, 970 over two seconds. Two things fix it: `spring(settle:)`, which bends the curve to land exactly, and rounding animated offsets to whole pixels. At 2x the hop is half a point and hard to see, which is why the 4K render looked fine.
 
 ## What to try next
 

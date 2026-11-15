@@ -49,3 +49,12 @@ import Testing
     #expect(f.shift(by: 40).index == 5)
     #expect(f.time == 1.5)
 }
+
+@Test func settledSpringArrivesAndStays() {
+    let f = { Frame(index: $0, fps: 60, frames: 600) }
+    #expect(f(10).spring(from: 10, settle: 40) == 0)
+    #expect(f(50).spring(from: 10, settle: 40) == 1)
+    #expect(f(400).spring(from: 10, settle: 40) == 1)
+    // Close to the free spring on the way there.
+    #expect(abs(f(30).spring(from: 10, settle: 40) - f(30).spring(from: 10)) < 0.02)
+}

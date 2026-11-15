@@ -46,7 +46,7 @@ struct Mark: View {
             for (row, cells) in grid.enumerated() {
                 for (column, place) in cells.enumerated() {
                     guard let place else { continue }
-                    let grow = frame.map { $0.spring(from: 8 + Int(place * 44), stiffness: 220, damping: 18) } ?? 1
+                    let grow = frame.map { $0.spring(from: 8 + Int(place * 44), stiffness: 220, damping: 18, settle: 30) } ?? 1
                     guard grow > 0 else { continue }
                     let centre = CGPoint(x: (CGFloat(column) + 0.5) * cell.width, y: (CGFloat(row) + 0.5) * cell.height)
                     // Half a point of overlap, so neighbours leave no seam.
@@ -76,13 +76,13 @@ struct Wordmark: View {
     var body: some View {
         HStack(spacing: unit) {
             ForEach(0..<Self.letters.count, id: \.self) { index in
-                let arrive = frame.map { $0.spring(from: 34 + index * 5, stiffness: 170, damping: 15) } ?? 1
+                let arrive = frame.map { $0.spring(from: 34 + index * 5, stiffness: 170, damping: 15, settle: 45) } ?? 1
                 ZStack(alignment: .topLeading) {
                     letter(Self.letters[index]).fill(Theme.hex(0x0A7470)).offset(x: unit * 0.22, y: unit * 0.22)
                     letter(Self.letters[index]).fill(Theme.hex(0x3FDC9C))
                 }
                 .frame(width: unit * 5, height: unit * 7, alignment: .topLeading)
-                .offset(y: -unit * 2 * (1 - arrive))
+                .offset(y: Stage.px(-unit * 2 * (1 - arrive)))
                 .opacity(frame.map { $0.interpolate([Double(34 + index * 5), Double(42 + index * 5)], [0, 1]) } ?? 1)
             }
         }
