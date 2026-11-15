@@ -115,3 +115,63 @@ func tone(_ name: String) throws -> URL {
         try await sample().video(to: scratch("nosound.mp4"), audio: URL(filePath: "/nonexistent.wav"))
     }
 }
+
+/// A pink disc on nothing.
+@MainActor
+func disc() -> Composition<some View> {
+    var composition = Composition(width: 64, height: 64, fps: 30, frames: 6) { _ in
+        Circle().fill(.pink).frame(width: 40, height: 40)
+    }
+    composition.transparent = true
+    return composition
+}
+
+/// The alpha of the corner and of the centre of a BGRA or RGBA image.
+func alphas(_ image: CGImage) throws -> (corner: UInt8, centre: UInt8) {
+    let data = try #require(image.dataProvider?.data as Data?)
+    let alphaFirst = image.alphaInfo == .premultipliedFirst || image.alphaInfo == .first
+    let littleEndian = image.bitmapInfo.contains(.byteOrder32Little)
+    // BGRA in memory is "alpha first, little endian"; RGBA is "alpha last".
+    let offset = alphaFirst ? (littleEndian ? 3 : 0) : 3
+    let at = { (x: Int, y: Int) in data[y * image.bytesPerRow + x * 4 + offset] }
+    return (at(1, 1), at(image.width / 2, image.height / 2))
+}
+
+@MainActor @Test(arguments: [RenderPath.coreAnimation, .imageRenderer, .imageRendererDirect])
+func transparentStillsKeepAlpha(path: RenderPath) throws {
+    let clear = try alphas(disc().still(at: 0, path: path))
+    #expect(clear.corner == 0)
+    #expect(clear.centre == 255)
+    let solid = try alphas(sample().still(at: 0, path: path))
+    #expect(solid.corner == 255)
+}
+
+@MainActor @Test func proRes4444KeepsAlpha() async throws {
+    let url = scratch("alpha.mov")
+    // Several frames: a target that is not cleared would keep the disc of the frame before.
+    try await disc().video(to: url, codec: .proRes4444)
+    let asset = AVURLAsset(url: url)
+    let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
+    let format = try #require(try await track.load(.formatDescriptions).first)
+    #expect(format.mediaSubType == .proRes4444)
+
+    let reader = try AVAssetReader(asset: asset)
+    let output = AVAssetReaderTrackOutput(track: track, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+    reader.add(output)
+    reader.startReading()
+    let buffer = try #require(output.copyNextSampleBuffer()?.imageBuffer)
+    CVPixelBufferLockBaseAddress(buffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+    let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
+    let row = CVPixelBufferGetBytesPerRow(buffer)
+    #expect(base[1 * row + 1 * 4 + 3] == 0)
+    #expect(base[32 * row + 32 * 4 + 3] == 255)
+}
+
+@MainActor @Test func proResNeedsAMovie() async throws {
+    let stats = try await sample().video(to: scratch("plain.mov"), codec: .proRes422)
+    #expect(stats.frames == 24)
+    await #expect(throws: FlipbookError.self) {
+        try await sample().video(to: scratch("wrong.mp4"), codec: .proRes422)
+    }
+}

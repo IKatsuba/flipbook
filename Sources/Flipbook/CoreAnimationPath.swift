@@ -29,8 +29,13 @@ final class CoreAnimationPath<Content: View>: FrameRenderer {
     let placeholder: MTLTexture
     var textureCache: CVMetalTextureCache!
 
-    init(_ composition: Composition<Content>, transparent: Bool = false) throws {
+    let clears: Bool
+
+    /// `transparent` gives the window no background; `clears` empties the target before every frame,
+    /// which CARenderer does not do by itself.
+    init(_ composition: Composition<Content>, transparent: Bool = false, clears: Bool = false) throws {
         self.composition = composition
+        self.clears = clears
         // AppKit's windows and SwiftUI's hosting views want an application object, even off screen.
         _ = NSApplication.shared
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
@@ -106,6 +111,19 @@ final class CoreAnimationPath<Content: View>: FrameRenderer {
         hosting.layoutSubtreeIfNeeded()
         hosting.displayIfNeeded()
         CATransaction.flush()
+
+        if clears {
+            let pass = MTLRenderPassDescriptor()
+            pass.colorAttachments[0].texture = texture
+            pass.colorAttachments[0].loadAction = .clear
+            pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+            pass.colorAttachments[0].storeAction = .store
+            guard let commands = queue.makeCommandBuffer(), let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else {
+                throw FlipbookError.metal("cannot clear the target")
+            }
+            encoder.endEncoding()
+            commands.commit()
+        }
 
         renderer.setDestination(texture)
         renderer.beginFrame(atTime: CACurrentMediaTime(), timeStamp: nil)

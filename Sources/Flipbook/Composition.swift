@@ -15,6 +15,9 @@ public struct Composition<Content: View> {
     public var content: (Frame) -> Content
     /// Used only by `RenderPath.metalComposite`, which draws it under `content`.
     public var backdrop: MetalBackdrop?
+    /// Leaves what the view does not paint transparent, instead of black. Stills keep the alpha, and so does
+    /// video in `Codec.proRes4444`; the other codecs have no alpha and show it black.
+    public var transparent = false
 
     public init(
         width: Int,
@@ -62,13 +65,21 @@ struct SizedFrame<Content: View>: View {
 public enum Codec: String, Sendable, CaseIterable {
     case hevc
     case h264
+    /// ProRes 422, into a `.mov`.
+    case proRes422 = "prores422"
+    /// ProRes 4444, into a `.mov`; the one that keeps the alpha of a transparent composition.
+    case proRes4444 = "prores4444"
 
     var avCodec: AVVideoCodecType {
         switch self {
         case .hevc: return .hevc
         case .h264: return .h264
+        case .proRes422: return .proRes422
+        case .proRes4444: return .proRes4444
         }
     }
+
+    public var isProRes: Bool { self == .proRes422 || self == .proRes4444 }
 }
 
 /// How frames get from SwiftUI into pixel buffers.

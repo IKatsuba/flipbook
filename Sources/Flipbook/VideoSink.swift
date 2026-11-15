@@ -18,7 +18,9 @@ final class VideoSink {
         self.audio = audio
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: url)
-        writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+        let movie = url.pathExtension.lowercased() == "mov"
+        guard movie || !codec.isProRes else { throw FlipbookError.writer("ProRes goes into a .mov file, not .\(url.pathExtension)") }
+        writer = try AVAssetWriter(outputURL: url, fileType: movie ? .mov : .mp4)
 
         // A target, not a floor: flat scenes come out far below 0.1 bit per pixel.
         let rate = bitrate ?? Int(Double(width * height * fps) * 0.1)
@@ -31,7 +33,7 @@ final class VideoSink {
         // Tells the hardware encoder to spend less effort per frame; the bitrate target stays the same.
         if prioritizeSpeed { compression[kVTCompressionPropertyKey_PrioritizeEncodingSpeedOverQuality as String] = true }
         if codec == .h264 { compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel }
-        let settings: [String: Any] = [
+        var settings: [String: Any] = [
             AVVideoCodecKey: codec.avCodec,
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
@@ -40,11 +42,14 @@ final class VideoSink {
                 AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
                 AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
             ],
-            AVVideoCompressionPropertiesKey: compression,
-            AVVideoEncoderSpecificationKey: [
-                kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder as String: true,
-            ],
         ]
+        // ProRes has no bitrate or keyframe interval to set, and may be encoded in software.
+        if !codec.isProRes {
+            settings[AVVideoCompressionPropertiesKey] = compression
+            settings[AVVideoEncoderSpecificationKey] = [
+                kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder as String: true,
+            ]
+        }
         input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
         input.expectsMediaDataInRealTime = false
         adaptor = AVAssetWriterInputPixelBufferAdaptor(

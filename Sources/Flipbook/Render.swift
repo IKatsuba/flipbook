@@ -41,12 +41,12 @@ extension Composition {
         switch path {
         case .imageRenderer: return ImageRendererPath(self, direct: false)
         case .imageRendererDirect: return ImageRendererPath(self, direct: true)
-        case .coreAnimation: return try CoreAnimationPath(self)
+        case .coreAnimation: return try CoreAnimationPath(self, transparent: transparent, clears: transparent)
         case .metalComposite: return try MetalCompositePath(self)
         }
     }
 
-    /// Encodes the composition to an MP4.
+    /// Encodes the composition to an MP4, or to a QuickTime movie when the file is a `.mov`.
     ///
     /// `range` renders part of it, for working on one scene of a long video: the view still gets
     /// the frame numbers of the whole composition, and the file starts at the range's first frame.
@@ -120,6 +120,10 @@ extension Composition {
             // A fresh buffer per frame: the encoder holds on to the ones it has not finished with.
             let buffer = try sink?.makeBuffer() ?? PixelBuffers.make(from: pool!)
             try renderer.render(index, into: buffer)
+            if transparent {
+                // Tell the encoder the colours are already multiplied by the alpha.
+                CVBufferSetAttachment(buffer, kCVImageBufferAlphaChannelModeKey, kCVImageBufferAlphaChannelMode_PremultipliedAlpha, .shouldPropagate)
+            }
             stats.drawSeconds += (clock.now - mark).seconds
 
             if hashFrames {

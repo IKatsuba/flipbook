@@ -150,11 +150,13 @@ let metalBackdrop = MetalBackdrop(
 
 @MainActor
 func demoComposition(
-    width: Int = 1080, height: Int = 1350, scale: Int, frames: Int = 360, metalBackdrop useMetal: Bool = false
+    width: Int = 1080, height: Int = 1350, scale: Int, frames: Int = 360, metalBackdrop useMetal: Bool = false,
+    transparent: Bool = false
 ) -> Composition<Card> {
     var composition = Composition(width: width, height: height, fps: 60, frames: frames, scale: scale) { frame in
-        Card(title: "Make", accent: "changelogs", frame: frame, showsBackdrop: !useMetal)
+        Card(title: "Make", accent: "changelogs", frame: frame, showsBackdrop: !useMetal && !transparent)
     }
+    composition.transparent = transparent
     if useMetal { composition.backdrop = metalBackdrop }
     return composition
 }

@@ -3,7 +3,7 @@ import Flipbook
 import Foundation
 import SwiftUI
 
-// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench|bench-all] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH] [--from n] [--to n] [--audio file]
+// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench|bench-all] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH] [--from n] [--to n] [--audio file] [--transparent 1]
 
 struct Arguments {
     var command = "render"
@@ -152,10 +152,14 @@ do {
     let path = arguments.path
     let useMetal = path == .metalComposite
     let size = arguments.size
-    let composition = demoComposition(width: size.width, height: size.height, scale: arguments.scale, frames: arguments.frames, metalBackdrop: useMetal)
+    // --transparent 1 drops the backdrop and keeps the alpha: for stills and --codec prores4444.
+    let composition = demoComposition(
+        width: size.width, height: size.height, scale: arguments.scale, frames: arguments.frames, metalBackdrop: useMetal,
+        transparent: arguments.options["transparent"] == "1"
+    )
     switch arguments.command {
     case "render":
-        let url = arguments.url("out/demo.mp4")
+        let url = arguments.url(arguments.codec.isProRes ? "out/demo.mov" : "out/demo.mp4")
         // --from and --to render part of the timeline.
         let from = Int(arguments.options["from"] ?? "") ?? 0
         let to = Int(arguments.options["to"] ?? "") ?? composition.frames

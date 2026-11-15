@@ -20,7 +20,7 @@ final class ImageRendererPath<Content: View>: FrameRenderer {
         renderer = ImageRenderer(content: composition.sized(at: 0))
         renderer.scale = CGFloat(composition.scale)
         renderer.proposedSize = ProposedViewSize(width: CGFloat(composition.width), height: CGFloat(composition.height))
-        renderer.isOpaque = true
+        renderer.isOpaque = !composition.transparent
         renderer.colorMode = .nonLinear
     }
 
