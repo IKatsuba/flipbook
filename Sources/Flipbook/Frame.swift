@@ -128,6 +128,16 @@ public struct Frame: Sendable, Equatable {
         return 1 + x
     }
 
+    // MARK: Text
+
+    /// The part of `text` typed by this frame: typing starts at frame `from` and adds
+    /// one character every `per` frames.
+    public func typed(_ text: String, from start: Int = 0, per: Double = 2) -> String {
+        precondition(per > 0)
+        let count = Int((Double(index - start) / per).rounded(.down))
+        return String(text.prefix(max(0, count)))
+    }
+
     // MARK: Time remapping
 
     /// A frame local to a sequence that starts at `from` and lasts `duration` frames,

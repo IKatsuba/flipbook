@@ -69,3 +69,13 @@ import Testing
     #expect(frame.loop(duration: 7).scale == 3)
     #expect(frame.shift(by: 5).scale == 3)
 }
+
+@Test func typedGrowsOneCharacterAtATime() {
+    let f = { Frame(index: $0, fps: 60, frames: 100) }
+    #expect(f(0).typed("héllo 👋", from: 10) == "")
+    #expect(f(10).typed("héllo 👋", from: 10) == "")
+    #expect(f(12).typed("héllo 👋", from: 10) == "h")
+    #expect(f(14).typed("héllo 👋", from: 10) == "hé")
+    #expect(f(99).typed("héllo 👋", from: 10) == "héllo 👋")
+    #expect(f(3).typed("abc", per: 0.5) == "abc")
+}

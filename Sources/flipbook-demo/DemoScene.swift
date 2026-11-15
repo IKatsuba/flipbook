@@ -52,7 +52,7 @@ struct Headline: View {
                 .opacity(frame.interpolate([30, 48], [0, 1], easing: .easeOut))
 
             // "changelogs" is typed, one character every four frames.
-            let typed = Int(frame.interpolate([70, 70 + Double(accent.count) * 4], [0, Double(accent.count)]))
+            let typed = frame.typed(accent, from: 70, per: 4).count
             let typing = typed < accent.count
             let cursorOn = typing || frame.loop(duration: 60).index < 30
             typedText(accent, count: typed)
