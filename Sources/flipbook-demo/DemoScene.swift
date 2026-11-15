@@ -207,10 +207,12 @@ let metalBackdrop = MetalBackdrop(
 )
 
 @MainActor
-func demoComposition(scale: Int, frames: Int = 360, metalBackdrop useMetal: Bool = false) -> Composition<Card> {
+func demoComposition(
+    width: Int = 1080, height: Int = 1350, scale: Int, frames: Int = 360, metalBackdrop useMetal: Bool = false
+) -> Composition<Card> {
     // Touch the grain before the first frame: nothing may be loaded lazily mid-render.
     _ = Grain.tile
-    var composition = Composition(width: 1080, height: 1350, fps: 60, frames: frames, scale: scale) { frame in
+    var composition = Composition(width: width, height: height, fps: 60, frames: frames, scale: scale) { frame in
         Card(title: "Make", accent: "changelogs", frame: frame, showsBackdrop: !useMetal)
     }
     if useMetal { composition.backdrop = metalBackdrop }

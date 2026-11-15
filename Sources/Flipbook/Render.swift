@@ -51,9 +51,10 @@ extension Composition {
         codec: Codec = .hevc,
         path: RenderPath = .imageRenderer,
         bitrate: Int? = nil,
+        prioritizeSpeed: Bool = false,
         hashFrames: Bool = false
     ) async throws -> RenderStats {
-        let sink = try VideoSink(url: url, width: pixelWidth, height: pixelHeight, fps: fps, codec: codec, bitrate: bitrate)
+        let sink = try VideoSink(url: url, width: pixelWidth, height: pixelHeight, fps: fps, codec: codec, bitrate: bitrate, prioritizeSpeed: prioritizeSpeed)
         return try await run(renderer: makeRenderer(path), sink: sink, range: 0..<frames, hashFrames: hashFrames)
     }
 
@@ -134,7 +135,9 @@ extension Composition {
 extension Composition {
     /// A measurement helper: how fast the encoder alone takes this composition's frames.
     /// Renders `distinct` consecutive frames up front, then times encoding `frames` frames that cycle through them.
-    public func encoderCeiling(to url: URL, codec: Codec = .hevc, path: RenderPath = .coreAnimation, distinct: Int = 30) async throws -> RenderStats {
+    public func encoderCeiling(
+        to url: URL, codec: Codec = .hevc, prioritizeSpeed: Bool = false, path: RenderPath = .coreAnimation, distinct: Int = 30
+    ) async throws -> RenderStats {
         let renderer = try makeRenderer(path)
         let pool = try PixelBuffers.makePool(width: pixelWidth, height: pixelHeight)
         let start = frames / 2
@@ -145,7 +148,7 @@ extension Composition {
         }
         let clock = ContinuousClock()
         var stats = RenderStats(frames: frames, width: pixelWidth, height: pixelHeight)
-        let sink = try VideoSink(url: url, width: pixelWidth, height: pixelHeight, fps: fps, codec: codec, bitrate: nil)
+        let sink = try VideoSink(url: url, width: pixelWidth, height: pixelHeight, fps: fps, codec: codec, bitrate: nil, prioritizeSpeed: prioritizeSpeed)
         let begin = clock.now
         for index in 0..<frames {
             try await sink.append(buffers[index % distinct], frame: index)

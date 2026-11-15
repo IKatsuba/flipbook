@@ -5,7 +5,7 @@ import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
-// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m]
+// flipbook-demo [render|still|layers|hashes|verify|diff|cross|bench] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH]
 
 struct Arguments {
     var command = "render"
@@ -33,6 +33,12 @@ struct Arguments {
     var codec: Codec { Codec(rawValue: options["codec"] ?? "hevc") ?? .hevc }
     var scale: Int { Int(options["scale"] ?? "") ?? 2 }
     var frames: Int { Int(options["frames"] ?? "") ?? 360 }
+    var speed: Bool { options["speed"] == "1" }
+    /// The card is designed for 1080×1350; other sizes exist to compare pixel counts.
+    var size: (width: Int, height: Int) {
+        let parts = (options["size"] ?? "1080x1350").split(separator: "x").compactMap { Int($0) }
+        return parts.count == 2 ? (parts[0], parts[1]) : (1080, 1350)
+    }
     func url(_ fallback: String) -> URL { URL(filePath: options["out"] ?? fallback) }
 }
 
@@ -56,6 +62,16 @@ func cpuSeconds() -> Double {
     getrusage(RUSAGE_SELF, &usage)
     func seconds(_ t: timeval) -> Double { Double(t.tv_sec) + Double(t.tv_usec) / 1e6 }
     return seconds(usage.ru_utime) + seconds(usage.ru_stime)
+}
+
+/// Peak physical footprint in bytes: what Activity Monitor calls memory, IOSurfaces included.
+func peakFootprint() -> Int {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+    let status = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
+    }
+    return status == KERN_SUCCESS ? Int(info.ledger_phys_footprint_peak) : 0
 }
 
 /// Peak resident set size in bytes (macOS reports `ru_maxrss` in bytes).
@@ -148,11 +164,12 @@ _ = NSApplication.shared
 do {
     let path = arguments.path
     let useMetal = path == .metalComposite
-    let composition = demoComposition(scale: arguments.scale, frames: arguments.frames, metalBackdrop: useMetal)
+    let size = arguments.size
+    let composition = demoComposition(width: size.width, height: size.height, scale: arguments.scale, frames: arguments.frames, metalBackdrop: useMetal)
     switch arguments.command {
     case "render":
         let url = arguments.url("out/demo.mp4")
-        let stats = try await composition.video(to: url, codec: arguments.codec, path: path)
+        let stats = try await composition.video(to: url, codec: arguments.codec, path: path, prioritizeSpeed: arguments.speed)
         print("\(url.path): \(summary(stats)), \(fileSize(url)) bytes")
 
     case "still":
@@ -198,15 +215,15 @@ do {
         let mode = arguments.options["mode"] ?? "video"
         let scratch = FileManager.default.temporaryDirectory.appending(path: "flipbook-bench-\(getpid()).mp4")
         defer { try? FileManager.default.removeItem(at: scratch) }
-        let warmup = demoComposition(scale: arguments.scale, frames: 30, metalBackdrop: useMetal)
-        _ = try await warmup.video(to: scratch, codec: arguments.codec, path: path)
+        let warmup = demoComposition(width: size.width, height: size.height, scale: arguments.scale, frames: 30, metalBackdrop: useMetal)
+        _ = try await warmup.video(to: scratch, codec: arguments.codec, path: path, prioritizeSpeed: arguments.speed)
 
         let clock = ContinuousClock()
         let cpuBefore = cpuSeconds()
         var stats: RenderStats
         switch mode {
         case "video":
-            stats = try await composition.video(to: scratch, codec: arguments.codec, path: path)
+            stats = try await composition.video(to: scratch, codec: arguments.codec, path: path, prioritizeSpeed: arguments.speed)
         case "draw":
             stats = RenderStats(frames: composition.frames, width: composition.pixelWidth, height: composition.pixelHeight)
             let start = clock.now
@@ -215,7 +232,7 @@ do {
             stats.totalSeconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) * 1e-18
             stats.drawSeconds = stats.totalSeconds
         case "encoder":
-            stats = try await composition.encoderCeiling(to: scratch, codec: arguments.codec)
+            stats = try await composition.encoderCeiling(to: scratch, codec: arguments.codec, prioritizeSpeed: arguments.speed)
         default:
             fail("unknown mode \(mode)")
         }
@@ -225,6 +242,7 @@ do {
             "mode": mode,
             "scale": arguments.scale,
             "codec": arguments.codec.rawValue,
+            "speed": arguments.speed,
             "frames": stats.frames,
             "width": stats.pixelWidth,
             "height": stats.pixelHeight,
@@ -235,6 +253,7 @@ do {
             "appendMsPerFrame": stats.appendSeconds / Double(stats.frames) * 1000,
             "finishMs": stats.finishSeconds * 1000,
             "peakRSS": peakRSS(),
+            "peakFootprint": peakFootprint(),
             "bytes": mode == "draw" ? 0 : fileSize(scratch),
         ]
         let json = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
