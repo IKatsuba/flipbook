@@ -48,7 +48,7 @@ struct Headline: View {
             let rise = frame.spring(from: 30, stiffness: 120, damping: 14, settle: 60)
             Text(title)
                 .foregroundStyle(.white)
-                .offset(y: 90 * (1 - rise))
+                .offset(y: frame.snap(90 * (1 - rise)))
                 .opacity(frame.interpolate([30, 48], [0, 1], easing: .easeOut))
 
             // "changelogs" is typed, one character every four frames.
@@ -103,7 +103,7 @@ struct Card: View {
                     .tracking(3)
                     .foregroundStyle(Palette.dim)
                     .opacity(frame.interpolate([10, 30], [0, 1], easing: .easeOut))
-                    .offset(x: frame.interpolate([10, 30], [-24, 0], easing: .easeOut))
+                    .offset(x: frame.snap(frame.interpolate([10, 30], [-24, 0], easing: .easeOut)))
 
                 Headline(title: title, accent: accent, frame: frame)
             }

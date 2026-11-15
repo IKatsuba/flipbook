@@ -10,11 +10,22 @@ public struct Frame: Sendable, Equatable {
     public let fps: Int
     /// Number of frames in the current sequence, loop or composition.
     public let frames: Int
+    /// Pixels per point in the composition being rendered.
+    public let scale: Int
 
-    public init(index: Int, fps: Int, frames: Int) {
+    public init(index: Int, fps: Int, frames: Int, scale: Int = 1) {
         self.index = index
         self.fps = fps
         self.frames = frames
+        self.scale = scale
+    }
+
+    /// A length rounded to whole pixels.
+    ///
+    /// Text layers sit on whole pixels whatever offset they are given, so an offset that is not
+    /// whole makes them round one way while moving and the other at rest. Snap what you animate.
+    public func snap(_ points: Double) -> CGFloat {
+        CGFloat((points * Double(scale)).rounded() / Double(scale))
     }
 
     /// Seconds since the start of the current sequence.
@@ -125,19 +136,19 @@ public struct Frame: Sendable, Equatable {
         let local = index - start
         let length = duration ?? max(frames - start, 0)
         guard local >= 0, local < length else { return nil }
-        return Frame(index: local, fps: fps, frames: length)
+        return Frame(index: local, fps: fps, frames: length, scale: scale)
     }
 
     /// The same timeline moved `by` frames later, without clipping.
     public func shift(by offset: Int) -> Frame {
-        Frame(index: index - offset, fps: fps, frames: frames)
+        Frame(index: index - offset, fps: fps, frames: frames, scale: scale)
     }
 
     /// A frame that repeats every `duration` frames.
     public func loop(duration: Int) -> Frame {
         precondition(duration > 0)
         let local = ((index % duration) + duration) % duration
-        return Frame(index: local, fps: fps, frames: duration)
+        return Frame(index: local, fps: fps, frames: duration, scale: scale)
     }
 }
 

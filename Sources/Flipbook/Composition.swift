@@ -36,7 +36,7 @@ public struct Composition<Content: View> {
     public var pixelHeight: Int { height * scale }
 
     public func frame(at index: Int) -> Frame {
-        Frame(index: index, fps: fps, frames: frames)
+        Frame(index: index, fps: fps, frames: frames, scale: scale)
     }
 
     /// The view for one frame, pinned to the composition's size.

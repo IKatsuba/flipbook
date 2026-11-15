@@ -58,3 +58,14 @@ import Testing
     // Close to the free spring on the way there.
     #expect(abs(f(30).spring(from: 10, settle: 40) - f(30).spring(from: 10)) < 0.02)
 }
+
+@Test func snapRoundsToThePixelGrid() {
+    #expect(Frame(index: 0, fps: 60, frames: 1).snap(10.4) == 10)
+    #expect(Frame(index: 0, fps: 60, frames: 1, scale: 2).snap(10.4) == 10.5)
+    #expect(Frame(index: 0, fps: 60, frames: 1, scale: 2).snap(-0.2) == 0)
+    // The scale survives time remapping.
+    let frame = Frame(index: 30, fps: 60, frames: 90, scale: 3)
+    #expect(frame.sequence(from: 10, duration: 40)?.scale == 3)
+    #expect(frame.loop(duration: 7).scale == 3)
+    #expect(frame.shift(by: 5).scale == 3)
+}
