@@ -1,0 +1,99 @@
+import AVFoundation
+import CoreVideo
+import SwiftUI
+
+/// What a render cost. Stage times are wall-clock sums over all frames.
+public struct RenderStats: Sendable, Codable {
+    public var frames = 0
+    public var pixelWidth = 0
+    public var pixelHeight = 0
+    /// Building the SwiftUI view and getting its pixels into the buffer.
+    public var drawSeconds = 0.0
+    /// Hashing, when asked for.
+    public var hashSeconds = 0.0
+    /// `append`, including waiting for the encoder to take more.
+    public var appendSeconds = 0.0
+    /// Draining the encoder and closing the file.
+    public var finishSeconds = 0.0
+    public var totalSeconds = 0.0
+    public var hashes: [String] = []
+
+    public var framesPerSecond: Double { totalSeconds > 0 ? Double(frames) / totalSeconds : 0 }
+}
+
+extension Duration {
+    var seconds: Double {
+        let (s, atto) = components
+        return Double(s) + Double(atto) * 1e-18
+    }
+}
+
+extension Composition {
+    func makeRenderer(_ path: RenderPath) throws -> any FrameRenderer {
+        switch path {
+        case .imageRenderer: return ImageRendererPath(self, direct: false)
+        case .imageRendererDirect: return ImageRendererPath(self, direct: true)
+        case .coreAnimation: return try CoreAnimationPath(self)
+        }
+    }
+
+    /// Encodes the composition to an MP4.
+    @discardableResult
+    public func video(
+        to url: URL,
+        codec: Codec = .hevc,
+        path: RenderPath = .imageRenderer,
+        bitrate: Int? = nil,
+        hashFrames: Bool = false
+    ) async throws -> RenderStats {
+        let sink = try VideoSink(url: url, width: pixelWidth, height: pixelHeight, fps: fps, codec: codec, bitrate: bitrate)
+        return try await run(renderer: makeRenderer(path), sink: sink, range: 0..<frames, hashFrames: hashFrames)
+    }
+
+    /// Renders frames without encoding them and returns the SHA-256 of every pixel buffer.
+    public func hashes(path: RenderPath = .imageRenderer, range: Range<Int>? = nil) async throws -> RenderStats {
+        try await run(renderer: makeRenderer(path), sink: nil, range: range ?? 0..<frames, hashFrames: true)
+    }
+
+    /// One frame as an image.
+    public func still(at index: Int, path: RenderPath = .imageRenderer) throws -> CGImage {
+        let pool = try PixelBuffers.makePool(width: pixelWidth, height: pixelHeight)
+        let buffer = try PixelBuffers.make(from: pool)
+        try makeRenderer(path).render(index, into: buffer)
+        return try PixelBuffers.image(buffer)
+    }
+
+    func run(renderer: any FrameRenderer, sink: VideoSink?, range: Range<Int>, hashFrames: Bool) async throws -> RenderStats {
+        let clock = ContinuousClock()
+        let pool = sink == nil ? try PixelBuffers.makePool(width: pixelWidth, height: pixelHeight) : nil
+        var stats = RenderStats(frames: range.count, pixelWidth: pixelWidth, pixelHeight: pixelHeight)
+        let start = clock.now
+
+        for index in range {
+            var mark = clock.now
+            // A fresh buffer per frame: the encoder holds on to the ones it has not finished with.
+            let buffer = try sink?.makeBuffer() ?? PixelBuffers.make(from: pool!)
+            try renderer.render(index, into: buffer)
+            stats.drawSeconds += (clock.now - mark).seconds
+
+            if hashFrames {
+                mark = clock.now
+                stats.hashes.append(PixelBuffers.hash(buffer))
+                stats.hashSeconds += (clock.now - mark).seconds
+            }
+            if let sink {
+                mark = clock.now
+                try await sink.append(buffer, frame: index - range.lowerBound)
+                stats.appendSeconds += (clock.now - mark).seconds
+            }
+        }
+
+        if let sink {
+            let mark = clock.now
+            try await sink.finish(frames: range.count)
+            stats.finishSeconds = (clock.now - mark).seconds
+        }
+        stats.totalSeconds = (clock.now - start).seconds
+        return stats
+    }
+}
