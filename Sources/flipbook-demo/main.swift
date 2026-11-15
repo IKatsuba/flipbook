@@ -2,6 +2,7 @@ import AppKit
 import Flipbook
 import Foundation
 import ImageIO
+import SwiftUI
 import UniformTypeIdentifiers
 
 // flipbook-demo [render|still|verify|hashes|bench] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n]
@@ -74,6 +75,72 @@ func summary(_ stats: RenderStats) -> String {
         + " (ms/frame: draw \(perFrame(stats.drawSeconds)), append \(perFrame(stats.appendSeconds)), finish \(perFrame(stats.finishSeconds)))"
 }
 
+/// Tightly packed BGRA bytes of a pixel buffer.
+func bytes(of buffer: CVPixelBuffer) -> [UInt8] {
+    CVPixelBufferLockBaseAddress(buffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+    let (width, height, stride) = (CVPixelBufferGetWidth(buffer) * 4, CVPixelBufferGetHeight(buffer), CVPixelBufferGetBytesPerRow(buffer))
+    let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
+    var out = [UInt8](repeating: 0, count: width * height)
+    for row in 0..<height {
+        out.withUnsafeMutableBufferPointer { $0.baseAddress!.advanced(by: row * width).update(from: base + row * stride, count: width) }
+    }
+    return out
+}
+
+/// Renders a range twice and says where and by how much the two passes disagree.
+@MainActor
+func diffPasses<V: View>(_ composition: Composition<V>, path: RenderPath, range: Range<Int>) throws {
+    var first: [Int: [UInt8]] = [:]
+    try composition.forEachFrame(path: path, range: range) { index, buffer in first[index] = bytes(of: buffer) }
+    try composition.forEachFrame(path: path, range: range) { index, buffer in
+        let (a, b) = (first[index]!, bytes(of: buffer))
+        guard a != b else { return }
+        let width = composition.pixelWidth
+        var count = 0, maxDelta = 0
+        var (minX, minY, maxX, maxY) = (Int.max, Int.max, 0, 0)
+        for pixel in 0..<(a.count / 4) {
+            var delta = 0
+            for channel in 0..<4 { delta = max(delta, abs(Int(a[pixel * 4 + channel]) - Int(b[pixel * 4 + channel]))) }
+            guard delta > 0 else { continue }
+            count += 1
+            maxDelta = max(maxDelta, delta)
+            let (x, y) = (pixel % width, pixel / width)
+            (minX, minY, maxX, maxY) = (min(minX, x), min(minY, y), max(maxX, x), max(maxY, y))
+        }
+        print("frame \(index): \(count) pixels differ, max channel delta \(maxDelta), bounds x \(minX)...\(maxX) y \(minY)...\(maxY)")
+    }
+}
+
+/// Mean absolute difference per channel between two frames.
+func meanDifference(_ a: [UInt8], _ b: [UInt8]) -> Double {
+    var sum = 0
+    for i in a.indices { sum += abs(Int(a[i]) - Int(b[i])) }
+    return Double(sum) / Double(a.count)
+}
+
+/// Checks that frame N of `path` shows frame N of the reference path, not a neighbour:
+/// an asynchronously drawn layer that lagged a frame behind would still be deterministic.
+@MainActor
+func crossCheck<V: View>(_ composition: Composition<V>, path: RenderPath, reference: RenderPath, range: Range<Int>) throws {
+    var expected: [Int: [UInt8]] = [:]
+    try composition.forEachFrame(path: reference, range: range) { index, buffer in expected[index] = bytes(of: buffer) }
+    var lagging = 0
+    try composition.forEachFrame(path: path, range: range) { index, buffer in
+        let actual = bytes(of: buffer)
+        let same = meanDifference(actual, expected[index]!)
+        let previous = expected[index - 1].map { meanDifference(actual, $0) }
+        let next = expected[index + 1].map { meanDifference(actual, $0) }
+        let closest = min(same, previous ?? .infinity, next ?? .infinity)
+        if closest != same { lagging += 1 }
+        if index % 10 == 0 || closest != same {
+            let show = { (value: Double?) in value.map { String(format: "%.3f", $0) } ?? "-" }
+            print("frame \(index): vs reference n \(show(same)), n-1 \(show(previous)), n+1 \(show(next))")
+        }
+    }
+    print("\(path.rawValue) vs \(reference.rawValue): \(lagging) of \(range.count) frames are closer to a neighbouring frame")
+}
+
 let arguments = Arguments(Array(CommandLine.arguments.dropFirst()))
 // SwiftUI's AppKit-backed pieces want an application object, even with no window on screen.
 _ = NSApplication.shared
@@ -94,8 +161,11 @@ do {
 
     case "hashes":
         // One hash per line, for comparing separate processes.
-        let stats = try await composition.hashes(path: arguments.path)
-        print(stats.hashes.joined(separator: "\n"))
+        let from = Int(arguments.options["from"] ?? "") ?? 0
+        for _ in 0..<(Int(arguments.options["passes"] ?? "") ?? 1) {
+            let stats = try await composition.hashes(path: arguments.path, range: from..<composition.frames)
+            print(stats.hashes.enumerated().map { "\($0.offset + from) \($0.element)" }.joined(separator: "\n"))
+        }
 
     case "verify":
         // Two renders, each with its own renderer, compared frame by frame.
@@ -108,6 +178,12 @@ do {
             print("differing frames: \(different.prefix(20).map(String.init).joined(separator: " "))")
             exit(2)
         }
+
+    case "diff":
+        try diffPasses(composition, path: arguments.path, range: 0..<min(arguments.frames, 60))
+
+    case "cross":
+        try crossCheck(composition, path: arguments.path, reference: .imageRenderer, range: 60..<min(arguments.frames, 120))
 
     case "bench":
         // Warm up SwiftUI, the glyph caches and the encoder, then measure one full render.

@@ -13,6 +13,8 @@ public struct Composition<Content: View> {
     public var frames: Int
     public var scale: Int
     public var content: (Frame) -> Content
+    /// Used only by `RenderPath.metalComposite`, which draws it under `content`.
+    public var backdrop: MetalBackdrop?
 
     public init(
         width: Int,
@@ -77,6 +79,8 @@ public enum RenderPath: String, Sendable, CaseIterable {
     case imageRendererDirect = "image-renderer-direct"
     /// An offscreen `NSHostingView` whose layer tree `CARenderer` draws into the pixel buffer's IOSurface.
     case coreAnimation = "core-animation"
+    /// `Composition.backdrop` in a Metal shader, with the SwiftUI content composited over it by Core Animation.
+    case metalComposite = "metal-composite"
 }
 
 public enum FlipbookError: Error, CustomStringConvertible {

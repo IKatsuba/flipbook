@@ -34,6 +34,7 @@ extension Composition {
         case .imageRenderer: return ImageRendererPath(self, direct: false)
         case .imageRendererDirect: return ImageRendererPath(self, direct: true)
         case .coreAnimation: return try CoreAnimationPath(self)
+        case .metalComposite: return try MetalCompositePath(self)
         }
     }
 
@@ -95,5 +96,31 @@ extension Composition {
         }
         stats.totalSeconds = (clock.now - start).seconds
         return stats
+    }
+}
+
+extension Composition {
+    /// Renders frames one after another with a single renderer and hands each pixel buffer (32BGRA) to `body`.
+    /// The buffer is reused, so copy out of it whatever has to outlive the call.
+    public func forEachFrame(
+        path: RenderPath = .imageRenderer,
+        range: Range<Int>? = nil,
+        _ body: (Int, CVPixelBuffer) throws -> Void
+    ) throws {
+        let renderer = try makeRenderer(path)
+        let buffer = try PixelBuffers.make(from: PixelBuffers.makePool(width: pixelWidth, height: pixelHeight))
+        for index in range ?? 0..<frames {
+            try renderer.render(index, into: buffer)
+            try body(index, buffer)
+        }
+    }
+}
+
+extension Composition {
+    /// The Core Animation layer tree SwiftUI builds for a frame, as text.
+    public func layerTree(at index: Int) throws -> String {
+        let path = try CoreAnimationPath(self)
+        try path.draw(index, to: path.placeholder)
+        return path.layerTree
     }
 }
