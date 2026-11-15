@@ -11,6 +11,7 @@ let comp = Composition(width: 1080, height: 1350, fps: 60, frames: 360, scale: 2
 }
 try await comp.video(to: URL(filePath: "out/demo.mp4"), codec: .hevc)
 try await comp.video(to: URL(filePath: "out/part.mp4"), range: 60..<150) { done, total in print("\(done)/\(total)") }
+try await comp.video(to: URL(filePath: "out/sound.mp4"), audio: URL(filePath: "music.m4a"))
 let image = try comp.still(at: 42)
 try comp.still(at: 42, to: URL(filePath: "out/frame.png"))
 ```

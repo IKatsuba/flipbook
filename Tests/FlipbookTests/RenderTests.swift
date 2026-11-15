@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import SwiftUI
 import Testing
@@ -80,4 +81,37 @@ func fontsFromFilesRender() throws {
 @Test func registeringSomethingElseFails() {
     #expect(throws: FlipbookError.self) { try Fonts.register(at: URL(filePath: "/nonexistent/font.ttf")) }
     #expect(throws: FlipbookError.self) { try Fonts.register(at: URL(filePath: "/etc/hosts")) }
+}
+
+/// Two seconds of a 440 Hz tone as a WAV file.
+func tone(_ name: String) throws -> URL {
+    let url = scratch(name)
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
+    let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 88200)!
+    buffer.frameLength = 88200
+    for sample in 0..<88200 { buffer.floatChannelData![0][sample] = 0.3 * sin(Float(sample) * 2 * .pi * 440 / 44100) }
+    try AVAudioFile(forWriting: url, settings: format.settings).write(from: buffer)
+    return url
+}
+
+@MainActor @Test func soundIsCutToTheVideo() async throws {
+    let audio = try tone("tone.wav")
+    for (name, range) in [("sound.mp4", 0..<24), ("sound-part.mp4", 12..<24)] {
+        let url = scratch(name)
+        try await sample().video(to: url, range: range, audio: audio)
+        let asset = AVURLAsset(url: url)
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        #expect(tracks.count == 1)
+        let length = try await tracks[0].load(.timeRange).duration.seconds
+        // 30 fps; AAC rounds to whole packets of 1024 samples.
+        #expect(abs(length - Double(range.count) / 30) < 0.06)
+        #expect(try await asset.loadTracks(withMediaType: .video).count == 1)
+    }
+}
+
+@MainActor @Test func missingSoundIsAnError() async throws {
+    await #expect(throws: FlipbookError.self) {
+        try await sample().video(to: scratch("nosound.mp4"), audio: URL(filePath: "/nonexistent.wav"))
+    }
 }

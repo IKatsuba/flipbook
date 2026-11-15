@@ -89,6 +89,7 @@ public enum FlipbookError: Error, CustomStringConvertible {
     case writer(String)
     case metal(String)
     case font(String)
+    case audio(String)
 
     public var description: String {
         switch self {
@@ -97,6 +98,7 @@ public enum FlipbookError: Error, CustomStringConvertible {
         case let .writer(message): return "AVAssetWriter: \(message)"
         case let .metal(message): return "Metal: \(message)"
         case let .font(message): return "Fonts: \(message)"
+        case let .audio(message): return "Audio: \(message)"
         }
     }
 }

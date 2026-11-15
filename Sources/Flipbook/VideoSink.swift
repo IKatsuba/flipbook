@@ -8,9 +8,14 @@ final class VideoSink {
     let input: AVAssetWriterInput
     let adaptor: AVAssetWriterInputPixelBufferAdaptor
     let fps: Int
+    let audio: AudioSource?
 
-    init(url: URL, width: Int, height: Int, fps: Int, codec: Codec, bitrate: Int?, prioritizeSpeed: Bool = false) throws {
+    init(
+        url: URL, width: Int, height: Int, fps: Int, codec: Codec, bitrate: Int?,
+        prioritizeSpeed: Bool = false, audio: AudioSource? = nil
+    ) throws {
         self.fps = fps
+        self.audio = audio
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: url)
         writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
@@ -48,6 +53,11 @@ final class VideoSink {
         )
         guard writer.canAdd(input) else { throw FlipbookError.writer("cannot add the video input") }
         writer.add(input)
+        if let audio {
+            guard writer.canAdd(audio.input) else { throw FlipbookError.audio("cannot add the audio input") }
+            writer.add(audio.input)
+            try audio.begin()
+        }
         guard writer.startWriting() else { throw FlipbookError.writer(writer.error?.localizedDescription ?? "startWriting failed") }
         writer.startSession(atSourceTime: .zero)
     }
@@ -58,11 +68,15 @@ final class VideoSink {
     }
 
     func append(_ buffer: CVPixelBuffer, frame: Int) async throws {
+        let time = CMTime(value: CMTimeValue(frame), timescale: CMTimeScale(fps))
+        // Audio runs half a second ahead of the picture, which is how the writer interleaves them.
+        let lead = time + CMTime(value: 1, timescale: 2)
+        try audio?.pump(upTo: lead)
         while !input.isReadyForMoreMediaData {
             guard writer.status == .writing else { break }
+            try audio?.pump(upTo: lead)
             try await Task.sleep(for: .microseconds(250))
         }
-        let time = CMTime(value: CMTimeValue(frame), timescale: CMTimeScale(fps))
         guard adaptor.append(buffer, withPresentationTime: time) else {
             throw FlipbookError.writer(writer.error?.localizedDescription ?? "append failed at frame \(frame)")
         }
@@ -70,6 +84,7 @@ final class VideoSink {
 
     func finish(frames: Int) async throws {
         input.markAsFinished()
+        try await audio?.drain()
         writer.endSession(atSourceTime: CMTime(value: CMTimeValue(frames), timescale: CMTimeScale(fps)))
         await writer.finishWriting()
         guard writer.status == .completed else {
