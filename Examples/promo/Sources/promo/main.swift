@@ -1,7 +1,7 @@
 import Flipbook
 import Foundation
 
-// promo [render|still|preview] [--scale n] [--frame n] [--from n] [--to n] [--out file]
+// promo [render|still|preview|social] [--scale n] [--frame n] [--from n] [--to n] [--out file]
 // Flipbook's promo: 1920×1080, 60 fps, 29 seconds. Run it from the repository's root.
 
 var options: [String: String] = [:]
@@ -23,6 +23,11 @@ case "still":
     let index = number("frame") ?? 0
     let url = URL(filePath: options["out"] ?? "out/flipbook-promo-\(index).png")
     try composition.still(at: index, to: url)
+    print(url.path)
+case "social":
+    // The image for the repository's social preview, at twice GitHub's 1280×640.
+    let url = URL(filePath: options["out"] ?? "docs/images/social.png")
+    try Composition(width: 1280, height: 640, frames: 1, scale: 2) { _ in SocialCard() }.still(at: 0, to: url)
     print(url.path)
 case "preview":
     composition.preview(title: "Flipbook promo", startAt: number("frame") ?? 0, playing: number("frame") == nil)
