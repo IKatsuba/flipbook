@@ -18,7 +18,7 @@ let image = try comp.still(at: 42)
 try comp.still(at: 42, to: URL(filePath: "out/frame.png"))
 ```
 
-Other repositories use it as a package: `.package(path:)` or `.package(url:)` to this repository, the `Flipbook` product, and a `main.swift` like the one above. There are no dependencies.
+Other repositories use it as a package: `.package(url: "https://github.com/IKatsuba/flipbook", from: "1.0.0")`, the `Flipbook` product, and a `main.swift` like the one above. It needs macOS 15 and has no dependencies.
 
 `width` and `height` are points; the video is `width × scale` by `height × scale` pixels (MyGo counts the other way round: pixels, divided by the scale). `Frame` has `index`, `time`, `progress`, `interpolate` (piecewise, with easing), `spring` (a damped spring in closed form, checked in the tests against fixed-step integration, with `settle:` to make it arrive exactly after a number of frames), `sequence(from:duration:)`, `shift(by:)` and `loop(duration:)`, and helpers for what every scene ends up needing: `typed` for text that is typed in, `fade(in:out:)`, `interpolate` over colours, and `snap` to round an animated offset to whole pixels.
 
@@ -145,3 +145,7 @@ At 1x, text that is moved by a spring keeps hopping by a pixel long after it loo
 - Text is still rasterised on the CPU into `CGDrawingLayer` bitmaps. It is cheap here; a scene with far more changing text would show whether that becomes the draw bottleneck.
 - Scenes that are harder for Core Animation: blurs, masks, `drawingGroup()`, images, and whether each survives `CARenderer` offscreen.
 - Motion blur by averaging sub-frame samples; HEVC with alpha; sound placed per sequence rather than one file under the whole video.
+
+## Licence
+
+[MIT](LICENSE).
