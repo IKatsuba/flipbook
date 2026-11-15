@@ -15,7 +15,7 @@ final class VideoSink {
         try? FileManager.default.removeItem(at: url)
         writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
 
-        // Grain is expensive to encode; 0.1 bit per pixel keeps it from turning into mush.
+        // A target, not a floor: flat scenes come out far below 0.1 bit per pixel.
         let rate = bitrate ?? Int(Double(width * height * fps) * 0.1)
         var compression: [String: Any] = [
             AVVideoAverageBitRateKey: rate,

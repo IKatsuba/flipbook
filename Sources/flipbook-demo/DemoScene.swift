@@ -1,49 +1,6 @@
 import Flipbook
 import SwiftUI
 
-/// SplitMix64: a tiny seedable generator, so "random" grain is a function of the frame number.
-struct SplitMix64: RandomNumberGenerator {
-    var state: UInt64
-    init(seed: UInt64) { state = seed &+ 0x9E37_79B9_7F4A_7C15 }
-    mutating func next() -> UInt64 {
-        state &+= 0x9E37_79B9_7F4A_7C15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-        return z ^ (z >> 31)
-    }
-}
-
-enum Grain {
-    static let side = 512
-
-    /// White noise with random alpha, generated once before rendering starts.
-    static let tile: CGImage = {
-        var generator = SplitMix64(seed: 0xF11B_B00C)
-        var pixels = [UInt8](repeating: 0, count: side * side * 4)
-        for i in 0..<(side * side) {
-            let alpha = UInt8(truncatingIfNeeded: generator.next() % 40)
-            pixels[i * 4 + 0] = alpha
-            pixels[i * 4 + 1] = alpha
-            pixels[i * 4 + 2] = alpha
-            pixels[i * 4 + 3] = alpha
-        }
-        let provider = CGDataProvider(data: Data(pixels) as CFData)!
-        return CGImage(
-            width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: side * 4,
-            space: CGColorSpace(name: CGColorSpace.sRGB)!,
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
-        )!
-    }()
-
-    /// Where the tile sits on a given frame.
-    static func offset(frame: Int) -> CGPoint {
-        var generator = SplitMix64(seed: UInt64(frame))
-        return CGPoint(x: -Double(generator.next() % UInt64(side)), y: -Double(generator.next() % UInt64(side)))
-    }
-}
-
 enum Palette {
     static let background = Color(red: 0.039, green: 0.039, blue: 0.059)
     static let pink = Color(red: 1.0, green: 0.31, blue: 0.64)
@@ -74,12 +31,6 @@ struct Backdrop: View {
                 context.stroke(lines, with: .color(.white.opacity(0.06)), lineWidth: 1)
             }
             .opacity(frame.interpolate([0, 40], [0, 1], easing: .easeOut))
-            Canvas(rendersAsynchronously: false) { context, size in
-                context.fill(
-                    Path(CGRect(origin: .zero, size: size)),
-                    with: .tiledImage(Image(decorative: Grain.tile, scale: 1), origin: Grain.offset(frame: frame.index))
-                )
-            }
         }
     }
 }
@@ -179,16 +130,9 @@ struct Card: View {
     }
 }
 
-/// The backdrop again, as a fragment shader: same colours, glow and grid, and hashed noise for grain.
+/// The backdrop again, as a fragment shader: same colours, glow and grid.
 let metalBackdrop = MetalBackdrop(
     source: """
-    static float grain(uint2 p, uint frame) {
-        uint h = p.x * 374761393u + p.y * 668265263u + frame * 2246822519u;
-        h = (h ^ (h >> 13)) * 1274126177u;
-        h ^= h >> 16;
-        return float(h % 40u) / 255.0;
-    }
-
     float4 backdrop(float2 point, Uniforms u) {
         float3 color = float3(0.039, 0.039, 0.059);
         float glow = 0.22 * saturate(1.0 - distance(point, float2(0.85, 0.1) * u.size) / 900.0);
@@ -196,8 +140,6 @@ let metalBackdrop = MetalBackdrop(
         float2 cell = fmod(point + 0.5, 54.0);
         float line = (cell.x < 1.0 || cell.y < 1.0) ? 0.06 * u.params[1] : 0.0;
         color = mix(color, float3(1.0), line);
-        float noise = grain(uint2(point), uint(u.frame));
-        color = color * (1.0 - noise) + noise;
         return float4(color * u.params[0], 1.0);
     }
     """,
@@ -210,8 +152,6 @@ let metalBackdrop = MetalBackdrop(
 func demoComposition(
     width: Int = 1080, height: Int = 1350, scale: Int, frames: Int = 360, metalBackdrop useMetal: Bool = false
 ) -> Composition<Card> {
-    // Touch the grain before the first frame: nothing may be loaded lazily mid-render.
-    _ = Grain.tile
     var composition = Composition(width: width, height: height, fps: 60, frames: frames, scale: scale) { frame in
         Card(title: "Make", accent: "changelogs", frame: frame, showsBackdrop: !useMetal)
     }
