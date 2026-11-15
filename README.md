@@ -17,7 +17,7 @@ try comp.still(at: 42, to: URL(filePath: "out/frame.png"))
 
 `width` and `height` are points; the video is `width × scale` by `height × scale` pixels (MyGo counts the other way round: pixels, divided by the scale). `Frame` has `index`, `time`, `progress`, `interpolate` (piecewise, with easing), `spring` (a damped spring in closed form, checked in the tests against fixed-step integration, with `settle:` to make it arrive exactly after a number of frames), `sequence(from:duration:)`, `shift(by:)` and `loop(duration:)`.
 
-The rule for views: depend on the frame and nothing else. No `withAnimation`, no `.animation`, no `Date()`, no `TimelineView`, and load fonts and images before rendering. Flipbook disables animations in the transaction of every frame, but cannot stop a view from reading a clock.
+The rule for views: depend on the frame and nothing else. No `withAnimation`, no `.animation`, no `Date()`, no `TimelineView`, and load fonts and images before rendering (`Fonts.register(at:)` takes a font file or a folder of them and returns the names for `Font.custom`). Flipbook disables animations in the transaction of every frame, but cannot stop a view from reading a clock.
 
 ## Running it
 

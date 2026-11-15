@@ -88,6 +88,7 @@ public enum FlipbookError: Error, CustomStringConvertible {
     case pixelBuffer(String, CVReturn)
     case writer(String)
     case metal(String)
+    case font(String)
 
     public var description: String {
         switch self {
@@ -95,6 +96,7 @@ public enum FlipbookError: Error, CustomStringConvertible {
         case let .pixelBuffer(what, code): return "\(what) failed (CVReturn \(code))"
         case let .writer(message): return "AVAssetWriter: \(message)"
         case let .metal(message): return "Metal: \(message)"
+        case let .font(message): return "Fonts: \(message)"
         }
     }
 }

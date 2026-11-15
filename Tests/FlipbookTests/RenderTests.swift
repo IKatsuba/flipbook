@@ -53,3 +53,31 @@ func scratch(_ name: String) -> URL {
     }
     #expect(seen == [1, 2, 3, 4, 5, 6])
 }
+
+/// Terminal ships SF Mono inside its bundle; it is not available by name until registered.
+let bundledFonts = URL(filePath: "/System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts")
+
+@MainActor @Test(.enabled(if: FileManager.default.fileExists(atPath: bundledFonts.path)))
+func fontsFromFilesRender() throws {
+    let names = try Fonts.register(at: bundledFonts.appending(path: "SF-Mono-Bold.otf"))
+    #expect(names == ["SFMono-Bold"])
+    #expect(try Fonts.register(at: bundledFonts).contains("SFMono-Regular"))
+
+    // Monospaced means "iiii" and "MMMM" are equally wide; in the fallback font they are not.
+    func inkWidth(_ text: String) throws -> Int {
+        let image = try Composition(width: 200, height: 40, frames: 1) { _ in
+            ZStack { Color.black; Text(text).font(.custom("SFMono-Bold", fixedSize: 24)).foregroundStyle(.white) }
+        }.still(at: 0)
+        let data = try #require(image.dataProvider?.data as Data?)
+        let columns = (0..<image.width).filter { x in
+            (0..<image.height).contains { y in data[y * image.bytesPerRow + x * 4 + 1] > 128 }
+        }
+        return (columns.last ?? 0) - (columns.first ?? 0)
+    }
+    #expect(abs(try inkWidth("iiii") - inkWidth("MMMM")) <= 14)
+}
+
+@Test func registeringSomethingElseFails() {
+    #expect(throws: FlipbookError.self) { try Fonts.register(at: URL(filePath: "/nonexistent/font.ttf")) }
+    #expect(throws: FlipbookError.self) { try Fonts.register(at: URL(filePath: "/etc/hosts")) }
+}
