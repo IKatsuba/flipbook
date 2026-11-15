@@ -49,7 +49,7 @@ extension Composition {
     public func video(
         to url: URL,
         codec: Codec = .hevc,
-        path: RenderPath = .imageRenderer,
+        path: RenderPath = .coreAnimation,
         bitrate: Int? = nil,
         prioritizeSpeed: Bool = false,
         hashFrames: Bool = false
@@ -59,12 +59,12 @@ extension Composition {
     }
 
     /// Renders frames without encoding them and returns the SHA-256 of every pixel buffer.
-    public func hashes(path: RenderPath = .imageRenderer, range: Range<Int>? = nil) async throws -> RenderStats {
+    public func hashes(path: RenderPath = .coreAnimation, range: Range<Int>? = nil) async throws -> RenderStats {
         try await run(renderer: makeRenderer(path), sink: nil, range: range ?? 0..<frames, hashFrames: true)
     }
 
     /// One frame as an image.
-    public func still(at index: Int, path: RenderPath = .imageRenderer) throws -> CGImage {
+    public func still(at index: Int, path: RenderPath = .coreAnimation) throws -> CGImage {
         let pool = try PixelBuffers.makePool(width: pixelWidth, height: pixelHeight)
         let buffer = try PixelBuffers.make(from: pool)
         try makeRenderer(path).render(index, into: buffer)
@@ -110,7 +110,7 @@ extension Composition {
     /// Renders frames one after another with a single renderer and hands each pixel buffer (32BGRA) to `body`.
     /// The buffer is reused, so copy out of it whatever has to outlive the call.
     public func forEachFrame(
-        path: RenderPath = .imageRenderer,
+        path: RenderPath = .coreAnimation,
         range: Range<Int>? = nil,
         _ body: (Int, CVPixelBuffer) throws -> Void
     ) throws {

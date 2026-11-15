@@ -24,7 +24,7 @@ struct Arguments {
     }
 
     var path: RenderPath {
-        guard let raw = options["path"] else { return .imageRenderer }
+        guard let raw = options["path"] else { return .coreAnimation }
         guard let path = RenderPath(rawValue: raw) else {
             fail("unknown path \(raw); use one of \(RenderPath.allCases.map(\.rawValue).joined(separator: ", "))")
         }

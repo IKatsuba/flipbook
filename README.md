@@ -21,9 +21,9 @@ The rule for views: depend on the frame and nothing else. No `withAnimation`, no
 
 ```sh
 swift run -c release flipbook-demo                                  # out/demo.mp4, 2160×2700, 6 s
-swift run -c release flipbook-demo render --path core-animation --speed 1
+swift run -c release flipbook-demo render --path image-renderer --speed 1
 swift run -c release flipbook-demo still --frame 90 --out out/frame.png
-swift run -c release flipbook-demo verify --path core-animation     # determinism, see below
+swift run -c release flipbook-demo verify                           # determinism, see below
 swift run -c release flipbook-demo layers                           # the CALayer tree SwiftUI builds
 swift run -c release flipbook-demo bench-all                        # the tables below, several minutes
 ```
@@ -36,9 +36,9 @@ All four fill a BGRA, IOSurface-backed `CVPixelBuffer` from the `AVAssetWriterIn
 
 | Path | How | Works |
 | --- | --- | --- |
-| `image-renderer` (default) | `ImageRenderer.cgImage`, then `CGContext.draw` into the pixel buffer | Yes |
+| `core-animation` (default) | `NSHostingView` in a window that is never ordered in; `CARenderer` draws its layer tree into a Metal texture that is the pixel buffer's IOSurface | Yes |
+| `image-renderer` | `ImageRenderer.cgImage`, then `CGContext.draw` into the pixel buffer | Yes, but see Determinism |
 | `image-renderer-direct` | `ImageRenderer.render(rasterizationScale:)` into a `CGContext` wrapping the pixel buffer | Yes, slowest |
-| `core-animation` | `NSHostingView` in a window that is never ordered in; `CARenderer` draws its layer tree into a Metal texture that is the pixel buffer's IOSurface | Yes |
 | `metal-composite` | A Metal fragment shader draws the backdrop (colour, glow, grid) into that texture, then `CARenderer` draws the SwiftUI text over it | Yes; needs `Composition.backdrop` |
 
 ### What turned out differently from what was expected
@@ -121,7 +121,7 @@ Behind the encoder, drawing costs: SwiftUI through Core Animation manages about 
 
 Same result at 1x and 2x. All 360 frames are distinct in every path (the frame counter and progress bar change every frame).
 
-The baseline is reproducible but not pure. Rendering the same sequence in a fresh process gives byte-identical buffers every time. Within one process, the second pass differs from the first on frames 1, 2, 31 and 32, by at most 1 in one 8-bit channel (`flipbook-demo diff`: between 13 and 3200 pixels at 1x). Those are the first two frames after something is drawn for the first time in the process: the first visible frames and the first frames with the headline. With the grain the list also had frames 12 and 13, where the card's opacity reaches 1, and a render started at frame 5 or 13 in a fresh process differed on its own first two frames in the same way. So with `ImageRenderer.cgImage` a frame depends, in the last bit, on what the process drew before it; the cause is inside RenderBox and was not pinned down further. Second and third passes agree with each other.
+`image-renderer` is reproducible but not pure. Rendering the same sequence in a fresh process gives byte-identical buffers every time. Within one process, the second pass differs from the first on frames 1, 2, 31 and 32, by at most 1 in one 8-bit channel (`flipbook-demo diff`: between 13 and 3200 pixels at 1x). Those are the first two frames after something is drawn for the first time in the process: the first visible frames and the first frames with the headline. With the grain the list also had frames 12 and 13, where the card's opacity reaches 1, and a render started at frame 5 or 13 in a fresh process differed on its own first two frames in the same way. So with `ImageRenderer.cgImage` a frame depends, in the last bit, on what the process drew before it; the cause is inside RenderBox and was not pinned down further. Second and third passes agree with each other.
 
 The other three paths passed every check, so on this machine their frames are a function of the frame number alone. Nothing here says anything about other GPUs or OS versions: the GPU paths are not expected to match each other or another machine bit for bit, and they differ from the baseline by a fraction of a level.
 
@@ -133,7 +133,7 @@ At 1x, text that is moved by a spring keeps hopping by a pixel long after it loo
 
 - More than one encoder. A single hardware session is the ceiling; splitting the timeline into segments encoded by parallel `VTCompressionSession`s and concatenated would show whether the media engine scales.
 - Rendering and encoding overlapped properly. The loop waits for the GPU after every frame; with the encoder as the limit that is free today, but it will matter once the encoder is faster.
-- Find what makes `ImageRenderer.cgImage` differ on first draws, or drop it as the default in favour of `core-animation`, which is as fast, uses far less resident memory and is pure, at the price of leaning on undocumented behaviour.
+- Find what makes `ImageRenderer.cgImage` differ on first draws. It is why `core-animation` is the default: as fast, far less resident memory, and pure, at the price of leaning on undocumented behaviour.
 - Text is still rasterised on the CPU into `CGDrawingLayer` bitmaps. It is cheap here; a scene with far more changing text would show whether that becomes the draw bottleneck.
 - Scenes that are harder for Core Animation: blurs, masks, `drawingGroup()`, images, and whether each survives `CARenderer` offscreen.
 - ProRes and transparent output; motion blur by averaging sub-frame samples; audio.
