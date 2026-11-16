@@ -21,7 +21,8 @@ struct Workspace {
     var sources: URL { package.appending(path: "Sources", directoryHint: .isDirectory) }
 
     /// Where the library comes from: a checkout named by FLIPBOOK_PACKAGE, the checkout this
-    /// command was built in, or the release of this command's version.
+    /// command was built in, the sources installed beside it (`../share/flipbook`, as Homebrew
+    /// lays them out), or the release of this command's version.
     enum Library: Equatable {
         case checkout(URL)
         case release(String)
@@ -42,7 +43,7 @@ struct Workspace {
 
         var description: String {
             switch self {
-            case let .checkout(url): return "the checkout at \(url.path)"
+            case let .checkout(url): return "the sources at \(url.path)"
             case let .release(version): return "\(Workspace.repository) \(version) (fetched on the first build)"
             }
         }
@@ -57,12 +58,19 @@ struct Workspace {
         if let path = ProcessInfo.processInfo.environment["FLIPBOOK_PACKAGE"], !path.isEmpty {
             return .checkout(URL(filePath: path).standardizedFileURL)
         }
-        var folder = (Bundle.main.executableURL ?? URL(filePath: CommandLine.arguments[0])).resolvingSymlinksInPath().deletingLastPathComponent()
+        let program = (Bundle.main.executableURL ?? URL(filePath: CommandLine.arguments[0])).resolvingSymlinksInPath()
+        return Workspace.library(for: program)
+    }
+
+    static func library(for program: URL) -> Library {
+        var folder = program.deletingLastPathComponent()
+        let installed = folder.deletingLastPathComponent().appending(path: "share/flipbook", directoryHint: .isDirectory)
         while folder.path != "/" {
-            if Workspace.isLibrary(folder) { return .checkout(folder) }
+            if isLibrary(folder) { return .checkout(folder) }
             folder = folder.deletingLastPathComponent()
         }
-        return .release(Workspace.version)
+        if isLibrary(installed) { return .checkout(installed) }
+        return .release(version)
     }
 
     /// A scene in the workspace: the target built from one scene file or one folder of them.

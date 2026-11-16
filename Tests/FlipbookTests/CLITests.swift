@@ -51,6 +51,15 @@ func home() -> URL {
     let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     #expect(Workspace.isLibrary(root))
     #expect(!Workspace.isLibrary(root.appending(path: "Sources")))
+    // A program inside the checkout builds against it; one installed with the sources beside it,
+    // as Homebrew does, builds against those; one on its own fetches the release.
+    #expect(Workspace.library(for: root.appending(path: ".build/release/flipbook")) == .checkout(root))
+    let prefix = home()
+    let share = prefix.appending(path: "share/flipbook", directoryHint: .isDirectory)
+    try? FileManager.default.createDirectory(at: share, withIntermediateDirectories: true)
+    try? FileManager.default.copyItem(at: root.appending(path: "Package.swift"), to: share.appending(path: "Package.swift"))
+    #expect(Workspace.library(for: prefix.appending(path: "bin/flipbook")) == .checkout(share))
+    #expect(Workspace.library(for: URL(filePath: "/nowhere/bin/flipbook")) == .release(Workspace.version))
 }
 
 @Test func theGuideCoversEveryCommand() {

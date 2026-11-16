@@ -29,9 +29,8 @@ Add the `Flipbook` product to an executable target, put the code above in its `m
 `flipbook` renders a scene written as one Swift file, with no package around it:
 
 ```sh
-git clone https://github.com/IKatsuba/flipbook && cd flipbook
-swift build -c release
-ln -s "$PWD/.build/release/flipbook" /usr/local/bin/flipbook
+brew tap ikatsuba/tap && brew trust ikatsuba/tap
+brew install flipbook
 
 flipbook doctor                        # what this machine is missing, and what to install
 flipbook new hello.swift               # a scene to start from
@@ -44,7 +43,7 @@ A scene file is the code at the top of this page with `try await composition.run
 
 It is meant to be handed to a coding agent. `flipbook skill` prints the guide an agent needs: the scene format, the API with its defaults, the rules that keep frames deterministic, and what to do per error. `flipbook doctor --json` says what is missing and how to get it, and every command takes `--json`. Given only the path of the command and "make a six second video announcing X in this folder", an agent that had never seen it produced the video on its first compile; what it had to guess went back into the guide.
 
-A symlink keeps the command using the checkout it was built in. A copy of the binary on its own fetches the library from this repository at the command's version instead, which needs that version to be released.
+Homebrew builds the command from source and puts the library's sources beside it, so scenes build against exactly that version, offline. It needs Xcode 16 or later, as building a scene does. From a clone instead: `swift build -c release`, then symlink `.build/release/flipbook` into your `PATH`; the command finds the checkout it was built in. A copy of the binary with nothing beside it fetches the library from this repository at its own version.
 
 ## What it does
 
