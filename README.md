@@ -45,6 +45,8 @@ It is meant to be handed to a coding agent. `flipbook skill` prints the guide an
 
 Homebrew builds the command from source and puts the library's sources beside it, so scenes build against exactly that version, offline. It needs Xcode 16 or later, as building a scene does. From a clone instead: `swift build -c release`, then symlink `.build/release/flipbook` into your `PATH`; the command finds the checkout it was built in. A copy of the binary with nothing beside it fetches the library from this repository at its own version.
 
+The examples in this repository are rendered this way and are nothing but scene folders: `flipbook render Examples/promo --out out/flipbook-promo.mp4` is the clip at the top of this page, and `flipbook still Examples/social --out docs/images/social.png` is the repository's social card. To try them against a change to the library rather than the installed version, use the command built in the checkout: `swift build -c release && .build/release/flipbook render Examples/promo`.
+
 ## What it does
 
 ![A composition and the frame it draws](docs/images/code.png)
@@ -88,7 +90,6 @@ swift run -c release flipbook-demo preview                          # a window t
 swift run -c release flipbook-demo verify                           # determinism, see below
 swift run -c release flipbook-demo layers                           # the CALayer tree SwiftUI builds
 swift run -c release flipbook-demo bench-all                        # the tables below, several minutes
-swift run -c release --package-path Examples/promo promo            # out/flipbook-promo.mp4
 ```
 
 ## Render paths
