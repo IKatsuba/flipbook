@@ -145,7 +145,7 @@ extension Composition {
         case .still:
             let index = request.frame ?? 0
             guard (0..<composition.frames).contains(index) else {
-                throw RunRequest.Mistake(description: "--frame is 0 to \(composition.frames - 1), not \(index)")
+                throw FlipbookError.frame("--frame is 0 to \(composition.frames - 1), not \(index)")
             }
             let url = absolute(request.out ?? "out/\(name)-\(index).png")
             try composition.still(at: index, to: url, path: request.path ?? .coreAnimation)

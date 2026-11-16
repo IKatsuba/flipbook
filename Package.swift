@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [
         .library(name: "Flipbook", targets: ["Flipbook"]),
+        .executable(name: "flipbook", targets: ["FlipbookCLI"]),
         .executable(name: "flipbook-demo", targets: ["flipbook-demo"]),
     ],
     targets: [
@@ -15,6 +16,7 @@ let package = Package(
             dependencies: ["Flipbook"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        .executableTarget(name: "FlipbookCLI", swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(
             name: "FlipbookTests",
             dependencies: ["Flipbook"],
