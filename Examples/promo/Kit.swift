@@ -42,7 +42,7 @@ struct Backdrop: View {
                 HStack {
                     Text("FLIPBOOK").tracking(5)
                     Spacer()
-                    Text("1.0.0")
+                    Text("1.2.0")
                 }
                 Spacer()
                 HStack {

@@ -4,12 +4,13 @@ import SwiftUI
 /// Where each scene starts and how long it lasts, in frames at 60 fps.
 enum Timeline {
     static let intro = (from: 0, duration: 210)
-    static let code = (from: 210, duration: 450)
-    static let motion = (from: 660, duration: 300)
-    static let pure = (from: 960, duration: 270)
-    static let speed = (from: 1230, duration: 270)
-    static let outro = (from: 1500, duration: 240)
-    static let frames = 1740
+    static let code = (from: 210, duration: 420)
+    static let command = (from: 630, duration: 300)
+    static let motion = (from: 930, duration: 240)
+    static let pure = (from: 1170, duration: 240)
+    static let speed = (from: 1410, duration: 240)
+    static let outro = (from: 1650, duration: 240)
+    static let frames = 1890
 }
 
 // MARK: Intro
@@ -38,7 +39,7 @@ struct Intro: View {
 
             Text("Flipbook")
                 .font(Look.serif(170, .black))
-                .tracking(-4)
+                .tracking(-1)
                 .foregroundStyle(Look.ink)
                 .padding(.top, 50)
                 .offset(y: frame.snap(40 * (1 - frame.spring(from: 96, stiffness: 140, damping: 18, settle: 45))))
@@ -61,28 +62,28 @@ struct CodeScene: View {
     let frame: Frame
 
     static let source: [[Code.Token]] = [
-        [("let ", Look.keyword), ("comp = ", Look.ink), ("Composition", Look.type), ("(", Look.ink)],
-        [("    width: ", Look.ink), ("1080", Look.number), (", height: ", Look.ink), ("1350", Look.number), (",", Look.ink)],
+        [("let ", Look.keyword), ("composition = ", Look.ink), ("Composition", Look.type), ("(", Look.ink)],
+        [("    width: ", Look.ink), ("1920", Look.number), (", height: ", Look.ink), ("1080", Look.number), (",", Look.ink)],
         [("    fps: ", Look.ink), ("60", Look.number), (", frames: ", Look.ink), ("120", Look.number)],
         [(") { frame ", Look.ink), ("in", Look.keyword)],
         [("    ", Look.ink), ("Text", Look.type), ("(", Look.ink), ("\"Hello\"", Look.string), (")", Look.ink)],
         [("        .", Look.ink), ("opacity", Look.call), ("(frame.", Look.ink), ("interpolate", Look.call), ("([", Look.ink), ("0", Look.number), (", ", Look.ink), ("20", Look.number), ("], [", Look.ink), ("0", Look.number), (", ", Look.ink), ("1", Look.number), ("]))", Look.ink)],
         [("        .", Look.ink), ("offset", Look.call), ("(y: ", Look.ink), ("60", Look.number), (" * (", Look.ink), ("1", Look.number), (" - frame.", Look.ink), ("spring", Look.call), ("()))", Look.ink)],
         [("}", Look.ink)],
-        [("try await ", Look.keyword), ("comp.", Look.ink), ("video", Look.call), ("(to: url)", Look.ink)],
+        [("try await ", Look.keyword), ("composition.", Look.ink), ("run", Look.call), ("()", Look.ink)],
     ]
 
     /// The frame the little screen shows: played forward, then dragged back and forth,
     /// which only works because nothing in the view remembers anything.
     var shown: Frame {
-        let index = frame.interpolate([250, 330, 362, 392, 422], [0, 119, 14, 70, 119], easing: .easeInOut)
+        let index = frame.interpolate([240, 306, 334, 362, 392], [0, 119, 14, 70, 119], easing: .easeInOut)
         return Frame(index: Int(index.rounded()), fps: 60, frames: 120, scale: frame.scale)
     }
 
     var body: some View {
         let code = Code(rows: Self.source, count: frame.typed(String(repeating: " ", count: 400), from: 30, per: 0.55).count, size: 30)
         VStack(alignment: .leading, spacing: 56) {
-            Heading(kicker: "ONE FUNCTION", title: "A video is a view of its frame number.", frame: frame)
+            Heading(kicker: "ONE FILE", title: "A video is a view of its frame number.", frame: frame)
             HStack(alignment: .top, spacing: 60) {
                 Panel { code.padding(40).frame(width: 1060, height: 500, alignment: .topLeading) }
                 screen
@@ -113,6 +114,70 @@ struct CodeScene: View {
             }
         }
         .opacity(frame.interpolate([200, 230], [0, 1]))
+    }
+}
+
+// MARK: The command
+
+/// A terminal on paper: the scene file from the page before, rendered and checked.
+struct CommandScene: View {
+    let frame: Frame
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 56) {
+            Heading(kicker: "ONE COMMAND", title: "One Swift file in, one video out.", frame: frame)
+            HStack(alignment: .top, spacing: 60) {
+                Panel { terminal.padding(40).frame(width: 1120, height: 470, alignment: .topLeading) }
+                    .opacity(frame.interpolate([20, 36], [0, 1]))
+                VStack(alignment: .leading, spacing: 34) {
+                    note("flipbook doctor", "what this Mac is missing, and how to get it", at: 196)
+                    note("flipbook skill", "the guide your coding agent reads", at: 210)
+                    note("flipbook preview", "a window that plays the scene", at: 224)
+                }
+                .padding(.top, 14)
+            }
+        }
+        .modifier(Flick(frame: frame))
+    }
+
+    var terminal: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            prompt("flipbook render hello.swift", from: 36)
+            line("building hello", Look.dim, at: 76)
+            line("out/hello.mp4: 120 frames 1920×1080 in 0.6 s (200 fps)", Look.ink, at: 104)
+            line(" ", Look.ink, at: 0)
+            prompt("flipbook doctor", from: 132)
+            line("ok    Swift 6 toolchain: Swift 6.4", Look.dim, at: 160)
+            line("ok    hardware HEVC encoder: Apple HEVC (HW)", Look.dim, at: 168)
+            line("Ready to render.", Look.ink, at: 180)
+        }
+    }
+
+    /// A command, typed after its prompt.
+    func prompt(_ command: String, from start: Int) -> some View {
+        (Text("$ ").foregroundStyle(Look.accent) + Text(frame.typed(command, from: start, per: 1) + " ").foregroundStyle(Look.ink))
+            .font(Look.mono(29, .medium))
+            .frame(height: 48)
+            .opacity(frame.index >= start - 8 ? 1 : 0)
+    }
+
+    /// What the command printed.
+    func line(_ text: String, _ color: Color, at start: Int) -> some View {
+        Text(text)
+            .font(Look.mono(29))
+            .foregroundStyle(color)
+            .frame(height: 48)
+            .opacity(frame.index >= start ? 1 : 0)
+    }
+
+    func note(_ name: String, _ what: String, at start: Int) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(name).font(Look.mono(27, .semibold)).foregroundStyle(Look.accent)
+            Text(what).font(Look.serif(28, .regular)).foregroundStyle(Look.dim)
+        }
+        .frame(width: 500, alignment: .leading)
+        .offset(x: frame.snap(frame.interpolate([Double(start), Double(start + 16)], [24, 0], easing: .easeOut)))
+        .opacity(frame.interpolate([Double(start), Double(start + 16)], [0, 1]))
     }
 }
 
@@ -273,13 +338,13 @@ struct SpeedScene: View {
 struct Outro: View {
     let frame: Frame
 
-    static let features = ["HEVC · H.264 · ProRes", "alpha", "sound", "preview window", "stills"]
+    static let features = ["one Swift file", "HEVC · H.264 · ProRes", "alpha", "sound", "preview"]
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 44) {
                 Page(phase: frame.loop(duration: 48).progress, size: CGSize(width: 150, height: 190))
-                Text("Flipbook").font(Look.serif(170, .black)).tracking(-4).foregroundStyle(Look.ink)
+                Text("Flipbook").font(Look.serif(170, .black)).tracking(-1).foregroundStyle(Look.ink)
             }
             .offset(y: frame.snap(40 * (1 - frame.spring(stiffness: 140, damping: 18, settle: 45))))
 
@@ -297,12 +362,12 @@ struct Outro: View {
             .padding(.top, 54)
 
             Panel {
-                Text(frame.typed(".package(url: \"https://github.com/IKatsuba/flipbook\", from: \"1.0.0\")", from: 70, per: 0.9) + " ")
+                (Text("$ ").foregroundStyle(Look.dim) + Text(frame.typed("brew install ikatsuba/tap/flipbook", from: 70, per: 1.4) + " "))
                     .font(Look.mono(30))
                     .foregroundStyle(Look.accent)
                     .padding(.horizontal, 36)
                     .lineLimit(1)
-                    .frame(width: 1400, height: 92, alignment: .leading)
+                    .frame(width: 760, height: 92, alignment: .leading)
             }
             .padding(.top, 54)
             .opacity(frame.interpolate([56, 72], [0, 1]))
@@ -335,6 +400,8 @@ struct Promo: View {
             Group {
                 if let local = frame.sequence(from: Timeline.code.from, duration: Timeline.code.duration) {
                     CodeScene(frame: local)
+                } else if let local = frame.sequence(from: Timeline.command.from, duration: Timeline.command.duration) {
+                    CommandScene(frame: local)
                 } else if let local = frame.sequence(from: Timeline.motion.from, duration: Timeline.motion.duration) {
                     MotionScene(frame: local)
                 } else if let local = frame.sequence(from: Timeline.pure.from, duration: Timeline.pure.duration) {

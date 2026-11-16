@@ -1,6 +1,6 @@
 import Flipbook
 
-// Flipbook's promo, made with Flipbook: 1920×1080, 60 fps, 29 seconds.
+// Flipbook's promo, made with Flipbook: 1920×1080, 60 fps, 31.5 seconds.
 //
 //   flipbook render Examples/promo --out out/flipbook-promo.mp4
 //   flipbook render Examples/promo --scale 2 --out out/flipbook-promo-4k.mp4
