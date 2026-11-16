@@ -30,7 +30,7 @@ flipbook render hello.swift            # out/hello.mp4
 
 That is all of it: no package, no project, nothing written beside the file. It needs macOS 15 and Xcode 16 or later; `flipbook doctor` says whether a Mac is ready and what to install if it is not.
 
-It began as an experiment, prompted by [MyGo's Render plugin](https://mygo.run/docs/plugins/render): how fast can SwiftUI be turned into video, measured honestly? The measurements are further down.
+It began as an experiment: how fast can SwiftUI be turned into video, measured honestly? The measurements are further down.
 
 ## The command
 
@@ -186,7 +186,7 @@ Apple M3 Pro (12 cores), 18 GB, macOS 26.6.2 (25G83), Swift 6.4, release build. 
 | `core-animation` | hevc, speed first | 1920×1080 (1x) | 302.6 (298.2–304.3) | 2.17 | 2.16 | 0.97 | 66.4 | 316.5 | 4.6 |
 | `metal-composite` | hevc, speed first | 1920×1080 (1x) | 309.6 (308.8–310.0) | 1.01 | 1.02 | 2.04 | 62.3 | 264.1 | 0.5 |
 
-The last four rows are 1920×1080, the frame size MyGo's 242 fps is quoted for. The scene, the machine and the encoder settings behind that number are not the same as here, so this is the same order of magnitude and no more: 183 to 204 fps with default HEVC, 303 to 310 fps speed first.
+The last four rows are 1920×1080, the usual size of a video: 183 to 204 fps with default HEVC, 303 to 310 fps speed first.
 
 Where the time goes, with the encoder taken out and then left alone ("drawing only" reuses one pixel buffer; "encoder only" renders 30 consecutive frames beforehand and times encoding 360 frames that cycle through them):
 

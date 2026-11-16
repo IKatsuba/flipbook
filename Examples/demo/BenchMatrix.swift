@@ -28,7 +28,7 @@ struct BenchMatrix {
             }
             configs.append(Config(path: "core-animation", mode: "video", scale: scale, codec: "h264"))
         }
-        // 1920×1080, the frame size MyGo quotes its number for.
+        // 1920×1080, the usual size of a video.
         for speed in [false, true] {
             for path in ["core-animation", "metal-composite"] {
                 configs.append(Config(path: path, mode: "video", scale: 1, speed: speed, size: "1920x1080"))
