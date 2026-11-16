@@ -11,12 +11,13 @@ flipbook \(Workspace.version): videos from SwiftUI views
   flipbook preview <scene> [--frame n]  a window that plays the scene, with a scrubber
   flipbook info <scene>                 size, frame rate and length
   flipbook doctor [--deep]              what this machine is missing, and what to install
-  flipbook skill                        the guide to writing scenes, for people and agents
+  flipbook skill                        the guide to writing scenes, for people and agents (also: guide)
   flipbook clean                        remove the build cache
 
-A scene is a .swift file, or a folder with a main.swift. Options of render:
-  --out file  --scale 1..4  --from n  --to n  --codec hevc|h264|prores422|prores4444
-  --audio file  --speed
+A scene is a .swift file, or a folder with a main.swift.
+  render: --out file  --scale 1..4  --from n  --to n  --audio file  --speed
+          --codec hevc|h264|prores422|prores4444   (default hevc)
+  still:  --frame n (default 0)  --out file.png  --scale 1..4
 Every command takes --json and then prints one JSON object. Exit status: 0 done,
 1 failed, 2 the scene does not compile.
 """
@@ -52,7 +53,7 @@ do {
     case "version", "--version":
         print(Workspace.version)
 
-    case "skill":
+    case "skill", "guide":
         print(skill)
 
     case "doctor":
@@ -81,7 +82,7 @@ do {
         }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try starter.write(to: url, atomically: true, encoding: .utf8)
-        json ? emit(["scene": url.path]) : print("\(url.path)\n\nflipbook preview \(path)\nflipbook render \(path)")
+        json ? emit(["scene": url.path]) : print("\(url.path)\n\nflipbook still \(path) --frame 90     # a frame to look at\nflipbook render \(path)               # the video\nflipbook preview \(path)              # a window that plays it")
 
     case "render", "still", "preview", "info":
         guard let path = arguments.first, !path.hasPrefix("-") else {

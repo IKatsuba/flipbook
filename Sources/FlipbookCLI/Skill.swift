@@ -83,7 +83,8 @@ try await composition.run()     // the last line; it reads the command the file 
 
 - `width` and `height` are points; the video is `width × scale` by `height × scale` pixels.
   1920×1080 at scale 1 is 1080p, at scale 2 it is 4K. Vertical video: 1080×1920.
-- `frames` is the length: seconds × fps.
+- `frames` is the length: seconds × fps. Frames are numbered from 0 to `frames - 1`.
+- `fps` defaults to 30 and `scale` to 1.
 - The view may be any SwiftUI. Define your own `View` structs above the composition and pass
   them the frame. A scene can also be a folder of `.swift` files with a `main.swift`.
 
@@ -100,6 +101,44 @@ try await composition.run()     // the last line; it reads the command the file 
 | `frame.snap(value)` | a length rounded to whole pixels |
 | `frame.sequence(from: 60, duration: 120)` | a frame counted from 60, or `nil` outside those 120 frames |
 | `frame.shift(by: 30)`, `frame.loop(duration: 60)` | the timeline moved later; a frame that repeats |
+
+The same, as declarations (every default shown):
+
+```swift
+struct Frame {                      // pass it to your own views: struct Title: View { let frame: Frame; ... }
+    let index: Int                  // 0-based, local to the current sequence
+    let fps: Int, frames: Int, scale: Int
+    var time: Double                // seconds
+    var progress: Double            // 0 at the first frame of the sequence, 1 at the last
+    func interpolate(_ input: [Double], _ output: [Double], easing: Easing = .linear, extrapolate: Extrapolation = .clamp) -> Double
+    func interpolate(_ input: [Double], _ output: [Color], easing: Easing = .linear) -> Color
+    func spring(from: Int = 0, mass: Double = 1, stiffness: Double = 100, damping: Double = 10, settle: Int? = nil) -> Double
+    func typed(_ text: String, from: Int = 0, per: Double = 2) -> String
+    func fade(in: Int = 0, out: Int = 0, easing: Easing = .linear) -> Double
+    func snap(_ points: Double) -> CGFloat
+    func sequence(from: Int, duration: Int? = nil) -> Frame?    // nil duration: to the end
+    func shift(by: Int) -> Frame
+    func loop(duration: Int) -> Frame
+}
+```
+
+- `interpolate` returns `Double`; SwiftUI takes it for `opacity`, `offset`, `scaleEffect` and `frame(width:)` as it is.
+- A spring with the default damping overshoots: it goes a little past 1 and comes back. Raise
+  `damping` to about 20 for one that does not. Before its `from` frame it is 0.
+- Outside a sequence, `frames`, `progress` and `fade` are those of the whole composition, so
+  `.opacity(frame.fade(out: 20))` on the root view fades the video out at its end.
+
+Typed text, without the line moving and with a cursor:
+
+```swift
+let line = "A local task board."
+let shown = frame.typed(line, from: 60, per: 2)
+let typing = shown.count < line.count
+ZStack(alignment: .leading) {
+    Text(line).hidden()             // holds the full width, so centred text does not shift as it grows
+    Text(shown + (typing || frame.loop(duration: 60).index < 30 ? "▍" : ""))
+}
+```
 
 Scenes on a timeline:
 
@@ -144,14 +183,22 @@ flipbook doctor [--deep] [--json]
 flipbook clean
 ```
 
-- `--from`/`--to` render part of the timeline, to check one scene of a long video quickly.
+- `--from`/`--to` render part of the timeline, to check one scene of a long video quickly:
+  frames `from` up to but not including `to`. The view still sees the whole video's frame numbers.
+- `still` writes frame 0 to `out/<scene name>-<frame>.png` unless told otherwise.
+- `--scale` replaces the composition's `scale`: `--scale 2` on a 1920×1080 scene gives 3840×2160.
+- The codec is HEVC unless you say so. It plays in QuickTime, Safari, recent Chrome and on phones;
+  for the widest reach (older Windows players, some upload forms) use `--codec h264`.
 - `--audio` lays a sound file under the video and cuts it to the video's length.
 - `--codec prores4444 --out x.mov` keeps transparency when the scene sets
   `composition.transparent = true` (make `composition` a `var`). ProRes needs a `.mov` name.
 - `--speed` encodes about 60% faster at the same bitrate.
-- `--json` prints one object: `{"output": "/absolute/path", "width", "height", "fps", "frames",
-  "duration", "rendered", "seconds", "renderFps"}` for render, `{"output", "frame", ...}` for
-  still, and `{"error": "...", "fix": "..."}` on failure.
+- `--json` prints one object on standard output. Every one has `command`, `width`, `height`
+  (pixels), `fps`, `frames` and `duration` (seconds) of the composition, and `summary`, a line
+  for people. `render` adds `output`, `codec`, `rendered` (frames written), `seconds` (how long it
+  took) and `renderFps`; `still` adds `output` and `frame`; `info` adds nothing. A failure is
+  `{"error": "...", "fix": "..."}` with a non-zero exit status.
+- `output` is an absolute path with links resolved, so `/tmp/x.mp4` comes back as `/private/tmp/x.mp4`.
 - Do not run `preview` unless the person asked to see it: it waits for them to close the window.
 
 Expect roughly 190 frames a second at 1080p and 50 at 4K on an M3 Pro.

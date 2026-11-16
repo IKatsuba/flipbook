@@ -24,6 +24,28 @@ try await comp.video(to: URL(filePath: "out/hello.mp4"))
 
 Add the `Flipbook` product to an executable target, put the code above in its `main.swift`, and `swift run`. It needs macOS 15.
 
+## The command
+
+`flipbook` renders a scene written as one Swift file, with no package around it:
+
+```sh
+git clone https://github.com/IKatsuba/flipbook && cd flipbook
+swift build -c release
+ln -s "$PWD/.build/release/flipbook" /usr/local/bin/flipbook
+
+flipbook doctor                        # what this machine is missing, and what to install
+flipbook new hello.swift               # a scene to start from
+flipbook still hello.swift --frame 90  # out/hello-90.png
+flipbook render hello.swift --out videos/hello.mp4
+flipbook preview hello.swift           # a window that plays it, with a scrubber
+```
+
+A scene file is the code at the top of this page with `try await composition.run()` as its last line. The command copies it into a package in `~/Library/Caches/flipbook`, builds it there (the library once, about a minute; a changed scene in a few seconds) and runs it where you are, so `--out` is your path and nothing is written beside the scene. A scene that does not compile comes back with the compiler's errors against your file and line, and exit status 2.
+
+It is meant to be handed to a coding agent. `flipbook skill` prints the guide an agent needs: the scene format, the API with its defaults, the rules that keep frames deterministic, and what to do per error. `flipbook doctor --json` says what is missing and how to get it, and every command takes `--json`. Given only the path of the command and "make a six second video announcing X in this folder", an agent that had never seen it produced the video on its first compile; what it had to guess went back into the guide.
+
+A symlink keeps the command using the checkout it was built in. A copy of the binary on its own fetches the library from this repository at the command's version instead, which needs that version to be released.
+
 ## What it does
 
 ![A composition and the frame it draws](docs/images/code.png)

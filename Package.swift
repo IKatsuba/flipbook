@@ -19,7 +19,7 @@ let package = Package(
         .executableTarget(name: "FlipbookCLI", swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(
             name: "FlipbookTests",
-            dependencies: ["Flipbook"],
+            dependencies: ["Flipbook", "FlipbookCLI"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ]
