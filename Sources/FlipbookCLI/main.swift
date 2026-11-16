@@ -10,6 +10,7 @@ flipbook \(Workspace.version): videos from SwiftUI views
   flipbook still <scene> [options]      one frame as PNG; --frame n, --out file.png
   flipbook preview <scene> [--frame n]  a window that plays the scene, with a scrubber
   flipbook info <scene>                 size, frame rate and length
+  flipbook run <scene> [arguments]      build the scene and hand it the arguments as they are
   flipbook doctor [--deep]              what this machine is missing, and what to install
   flipbook skill                        the guide to writing scenes, for people and agents (also: guide)
   flipbook clean                        remove the build cache
@@ -84,7 +85,7 @@ do {
         try starter.write(to: url, atomically: true, encoding: .utf8)
         json ? emit(["scene": url.path]) : print("\(url.path)\n\nflipbook still \(path) --frame 90     # a frame to look at\nflipbook render \(path)               # the video\nflipbook preview \(path)              # a window that plays it")
 
-    case "render", "still", "preview", "info":
+    case "render", "still", "preview", "info", "run":
         guard let path = arguments.first, !path.hasPrefix("-") else {
             throw Failure("\(command) needs a scene", fix: "For example: flipbook \(command) scene.swift")
         }
@@ -93,7 +94,9 @@ do {
         let changed = try workspace.sync(scene)
         let program = try workspace.build(scene, quiet: json || !changed)
         // The scene runs where the command was run, so the paths it is given are the caller's.
-        let status = try Shell.hand(over: program, [command] + arguments.dropFirst(), environment: [
+        // `run` hands the scene its arguments as they are, for scenes with commands of their own.
+        let handed = command == "run" ? Array(arguments.dropFirst()) : [command] + arguments.dropFirst()
+        let status = try Shell.hand(over: program, handed, environment: [
             "FLIPBOOK_SCENE_DIR": scene.directory.path,
             "FLIPBOOK_SCENE_NAME": scene.name,
         ])

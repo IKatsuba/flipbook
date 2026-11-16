@@ -7,15 +7,9 @@ let package = Package(
     products: [
         .library(name: "Flipbook", targets: ["Flipbook"]),
         .executable(name: "flipbook", targets: ["FlipbookCLI"]),
-        .executable(name: "flipbook-demo", targets: ["flipbook-demo"]),
     ],
     targets: [
         .target(name: "Flipbook", swiftSettings: [.swiftLanguageMode(.v5)]),
-        .executableTarget(
-            name: "flipbook-demo",
-            dependencies: ["Flipbook"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
-        ),
         .executableTarget(name: "FlipbookCLI", swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(
             name: "FlipbookTests",

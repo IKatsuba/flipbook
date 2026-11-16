@@ -178,6 +178,7 @@ flipbook render <scene> [--out file] [--scale 1..4] [--from n] [--to n]
 flipbook still <scene> [--frame n] [--out file.png] [--scale n] [--json]
 flipbook info <scene> [--json]      # size, fps, frames, duration, without rendering
 flipbook preview <scene> [--frame n]   # a window; it blocks until the person closes it
+flipbook run <scene> [arguments]    # for a scene that reads its own arguments
 flipbook new <scene.swift>
 flipbook doctor [--deep] [--json]
 flipbook clean
@@ -200,6 +201,8 @@ flipbook clean
   `{"error": "...", "fix": "..."}` with a non-zero exit status.
 - `output` is an absolute path with links resolved, so `/tmp/x.mp4` comes back as `/private/tmp/x.mp4`.
 - Do not run `preview` unless the person asked to see it: it waits for them to close the window.
+- `run` builds the scene and passes it whatever follows, untouched. A scene that wants options of
+  its own reads `CommandLine.arguments` and calls `composition.run(theRest)` with what is left.
 
 Expect roughly 190 frames a second at 1080p and 50 at 4K on an M3 Pro.
 

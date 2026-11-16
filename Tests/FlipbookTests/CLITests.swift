@@ -45,7 +45,7 @@ func home() -> URL {
 }
 
 @Test func libraryComesFromACheckoutOrARelease() {
-    #expect(Workspace.Library.release("1.1.0").dependency.contains("exact: \"1.1.0\""))
+    #expect(Workspace.Library.release("1.2.0").dependency.contains("exact: \"1.2.0\""))
     #expect(Workspace.Library.checkout(URL(filePath: "/x/flipbook")).dependency.contains("path: \"/x/flipbook\""))
     // This repository is recognised as the library; a folder that is not one is not.
     let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -63,7 +63,7 @@ func home() -> URL {
 }
 
 @Test func theGuideCoversEveryCommand() {
-    for word in ["doctor", "render", "still", "info", "preview", "new", "clean", "--json", "frame.snap", "settle", "Assets.url"] {
+    for word in ["doctor", "run <scene>", "render", "still", "info", "preview", "new", "clean", "--json", "frame.snap", "settle", "Assets.url"] {
         #expect(skill.contains(word))
     }
     #expect(starter.contains("try await composition.run()"))

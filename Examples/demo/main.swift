@@ -3,7 +3,20 @@ import Flipbook
 import Foundation
 import SwiftUI
 
-// flipbook-demo [render|still|preview|layers|hashes|verify|diff|cross|bench|bench-all] [--path p] [--scale n] [--codec c] [--out file] [--frame n] [--frames n] [--mode m] [--speed 1] [--size WxH] [--from n] [--to n] [--audio file] [--transparent 1]
+// The scene everything in the README was measured on, and the measurements.
+//
+//   flipbook render Examples/demo                       out/demo.mp4, 2160×2700, 6 s
+//   flipbook still Examples/demo --frame 90
+//   flipbook preview Examples/demo
+//
+// render, still, preview and info take the command's usual options, and three of the demo's own:
+// --frames n, --size WxH and --transparent 1. The measurements are commands of this scene, so
+// they go through `flipbook run`:
+//
+//   flipbook run Examples/demo verify [--path p] [--scale n]     determinism
+//   flipbook run Examples/demo layers                            the CALayer tree SwiftUI builds
+//   flipbook run Examples/demo bench-all [--runs n]              the README tables, several minutes
+//   flipbook run Examples/demo hashes|diff|cross|bench ...
 
 struct Arguments {
     var command = "render"
@@ -41,7 +54,7 @@ struct Arguments {
 }
 
 func fail(_ message: String) -> Never {
-    FileHandle.standardError.write(Data("flipbook-demo: \(message)\n".utf8))
+    FileHandle.standardError.write(Data("demo: \(message)\n".utf8))
     exit(1)
 }
 
@@ -146,7 +159,28 @@ func crossCheck<V: View>(_ composition: Composition<V>, path: RenderPath, refere
     print("\(path.rawValue) vs \(reference.rawValue): \(lagging) of \(range.count) frames are closer to a neighbouring frame")
 }
 
-let arguments = Arguments(Array(CommandLine.arguments.dropFirst()))
+// What the command line asks for. The usual commands go to the composition's own run(),
+// after the demo's options are taken out of the arguments.
+var raw = Array(CommandLine.arguments.dropFirst())
+if raw.first.map({ ["render", "still", "preview", "info"].contains($0) || $0.hasPrefix("--") }) ?? true {
+    func take(_ option: String) -> String? {
+        guard let at = raw.firstIndex(of: option), at + 1 < raw.count else { return nil }
+        defer { raw.removeSubrange(at...(at + 1)) }
+        return raw[at + 1]
+    }
+    let frames = take("--frames").flatMap { Int($0) } ?? 360
+    let size = (take("--size") ?? "1080x1350").split(separator: "x").compactMap { Int($0) }
+    let transparent = take("--transparent") == "1"
+    let metal = raw.firstIndex(of: "--path").map { raw.indices.contains($0 + 1) && raw[$0 + 1] == RenderPath.metalComposite.rawValue } ?? false
+    let composition = demoComposition(
+        width: size.count == 2 ? size[0] : 1080, height: size.count == 2 ? size[1] : 1350, scale: 2, frames: frames,
+        metalBackdrop: metal, transparent: transparent
+    )
+    await composition.run(raw)
+    exit(0)
+}
+
+let arguments = Arguments(raw)
 
 do {
     let path = arguments.path
@@ -158,29 +192,6 @@ do {
         transparent: arguments.options["transparent"] == "1"
     )
     switch arguments.command {
-    case "render":
-        let url = arguments.url(arguments.codec.isProRes ? "out/demo.mov" : "out/demo.mp4")
-        // --from and --to render part of the timeline.
-        let from = Int(arguments.options["from"] ?? "") ?? 0
-        let to = Int(arguments.options["to"] ?? "") ?? composition.frames
-        let stats = try await composition.video(to: url, codec: arguments.codec, path: path, range: from..<to, audio: arguments.options["audio"].map { URL(filePath: $0) }, prioritizeSpeed: arguments.speed) { done, total in
-            // A line that rewrites itself, when someone is watching.
-            guard isatty(STDERR_FILENO) != 0, done % 30 == 0 || done == total else { return }
-            FileHandle.standardError.write(Data("\r\(done)/\(total) frames\(done == total ? "\n" : "")".utf8))
-        }
-        print("\(url.path): \(summary(stats)), \(fileSize(url)) bytes")
-
-    case "still":
-        let index = Int(arguments.options["frame"] ?? "") ?? 120
-        let url = arguments.url("out/still-\(index).png")
-        try composition.still(at: index, to: url, path: path)
-        print(url.path)
-
-    case "preview":
-        // A window that plays the scene; --frame starts it paused there.
-        let start = Int(arguments.options["frame"] ?? "")
-        composition.preview(title: "flipbook-demo", startAt: start ?? 0, playing: start == nil)
-
     case "layers":
         // What SwiftUI hands to Core Animation for one frame.
         print(try composition.layerTree(at: Int(arguments.options["frame"] ?? "") ?? 120))

@@ -4,7 +4,7 @@ import Foundation
 /// Where scenes are built: one Swift package shared by every scene, so the library is compiled once.
 /// It lives in the user's cache folder, out of the way of the scene and of the repository it sits in.
 struct Workspace {
-    static let version = "1.1.0"
+    static let version = "1.2.0"
     static let repository = "https://github.com/IKatsuba/flipbook"
 
     let home: URL
