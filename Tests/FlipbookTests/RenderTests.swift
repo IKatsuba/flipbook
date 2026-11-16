@@ -175,3 +175,25 @@ func transparentStillsKeepAlpha(path: RenderPath) throws {
         try await sample().video(to: scratch("wrong.mp4"), codec: .proRes422)
     }
 }
+
+@Test func commandLinesAreRead() throws {
+    #expect(try RunRequest([]) == RunRequest(["render"]))
+    let render = try RunRequest(["render", "--out", "a.mov", "--scale", "2", "--from", "10", "--to", "20", "--codec", "prores4444", "--speed", "--json"])
+    #expect(render.out == "a.mov" && render.scale == 2 && render.from == 10 && render.to == 20)
+    #expect(render.codec == .proRes4444 && render.speed && render.json)
+    #expect(try RunRequest(["still", "--frame", "42"]).frame == 42)
+    #expect(try RunRequest(["--scale", "2"]).command == .render)
+    for wrong in [["fly"], ["render", "--frame"], ["render", "--scale", "two"], ["render", "--scale", "9"], ["render", "--codec", "gif"], ["still", "--loud"]] {
+        #expect(throws: RunRequest.Mistake.self) { try RunRequest(wrong) }
+    }
+}
+
+@MainActor @Test func runWritesWhereItIsTold() async throws {
+    let video = scratch("run/clip.mp4")
+    await sample().run(["render", "--out", video.path, "--from", "0", "--to", "6"])
+    #expect(try await AVURLAsset(url: video).loadTracks(withMediaType: .video).count == 1)
+    let still = scratch("run/still.png")
+    await sample().run(["still", "--frame", "3", "--out", still.path, "--scale", "2"])
+    let source = try #require(CGImageSourceCreateWithURL(still as CFURL, nil))
+    #expect(try #require(CGImageSourceCreateImageAtIndex(source, 0, nil)).width == 320)
+}
